@@ -86,7 +86,7 @@ const DEFAULT = {
   mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2,
   wireColor:'#1a2a1e', wire:2.5,
   images:[], imgEvery:1, imgSize:2.2, imgGlow:true,
-  snow:140, flake:1, stick:true,
+  snow:140, flake:1, stick:true, fall:'snow',
   wind:0.3, gust:0.5,
 };
 
@@ -238,24 +238,69 @@ function step(dt,settle){
   for(const ch of chains)for(const p of ch.P){
     if(p.snow<0.02)continue;
     const v=Math.hypot(p.x-p.px,p.y-p.py);
-    if(v>0.9){const loss=Math.min(p.snow,(v-0.9)*0.07);p.snow-=loss;if(Math.random()<loss*5)flakes.push(newFlake(p.x,p.y+2,true))}
+    if(v>0.9){const loss=Math.min(p.snow,(v-0.9)*0.07);p.snow-=loss;if(Math.random()<loss*5)flakes.push(newFlake(p.x,p.y+2,true,'snow'))}
   }
   updateFlakes(t);
 }
-function newFlake(x,y,tmp){const r=(0.8+Math.random()*2.2)*cfg.flake;return{x,y,r,ph:Math.random()*6.283,vy:0.5+r*0.32+Math.random()*0.4,tmp}}
+const PETAL_COLORS=['#ff9cc0','#ff6f9c','#f03a5f','#ffc4d8','#d81e46'];
+const LEAF_COLORS=['#e8731c','#c9381e','#f2b02a','#a8611f','#d9501a','#b8862a'];
+function makeSprites(colors,drawFn,size){return colors.map(c=>{const cv=document.createElement('canvas');cv.width=cv.height=size;const g=cv.getContext('2d');drawFn(g,c,size);return cv})}
+const petalSprites=makeSprites(PETAL_COLORS,(g,c,S)=>{
+  const k=hex2rgb(c);const gr=g.createLinearGradient(0,S*0.1,0,S*0.9);gr.addColorStop(0,rgb(mix(k,WHITE,0.35)));gr.addColorStop(1,rgb(mix(k,BLACK,0.12)));
+  g.fillStyle=gr;g.beginPath();g.moveTo(S/2,S*0.92);g.bezierCurveTo(S*0.05,S*0.62,S*0.12,S*0.12,S*0.42,S*0.08);g.quadraticCurveTo(S/2,S*0.18,S*0.58,S*0.08);g.bezierCurveTo(S*0.88,S*0.12,S*0.95,S*0.62,S/2,S*0.92);g.fill();
+  g.strokeStyle=rgb(mix(k,BLACK,0.2),0.35);g.lineWidth=S*0.02;g.beginPath();g.moveTo(S/2,S*0.88);g.quadraticCurveTo(S*0.47,S*0.5,S/2,S*0.2);g.stroke();
+},48);
+const leafSprites=[].concat(
+  makeSprites(LEAF_COLORS,(g,c,S)=>{ // maple
+    const k=hex2rgb(c);g.translate(S/2,S*0.56);
+    g.beginPath();for(let i=0;i<=200;i++){const a=i/200*Math.PI*2;const th=a-Math.PI/2;let r=0.5+0.5*Math.pow(Math.abs(Math.cos(2.5*th)),0.6);r*=1-0.18*Math.pow(Math.abs(Math.cos(12.5*th)),8);if(Math.sin(a+Math.PI/2)>0.88)r*=0.35;r*=S*0.42;const x=Math.cos(a)*r,y=Math.sin(a)*r;i?g.lineTo(x,y):g.moveTo(x,y)}g.closePath();
+    const gr=g.createRadialGradient(0,0,0,0,0,S*0.45);gr.addColorStop(0,rgb(mix(k,WHITE,0.15)));gr.addColorStop(1,rgb(mix(k,BLACK,0.25)));g.fillStyle=gr;g.fill();
+    g.strokeStyle=rgb(mix(k,BLACK,0.4),0.6);g.lineWidth=S*0.018;for(const a of [-90,-30,-150,30,150]){const r=a*Math.PI/180;g.beginPath();g.moveTo(0,S*0.05);g.lineTo(Math.cos(r)*S*0.33,Math.sin(r)*S*0.33);g.stroke()}
+    g.beginPath();g.moveTo(0,S*0.05);g.lineTo(0,S*0.4);g.lineWidth=S*0.03;g.stroke();
+  },64),
+  makeSprites(LEAF_COLORS,(g,c,S)=>{ // oval leaf
+    const k=hex2rgb(c);g.translate(S/2,S/2);g.rotate(0.5);
+    g.beginPath();g.moveTo(0,-S*0.42);g.bezierCurveTo(S*0.3,-S*0.25,S*0.28,S*0.2,0,S*0.32);g.bezierCurveTo(-S*0.28,S*0.2,-S*0.3,-S*0.25,0,-S*0.42);
+    const gr=g.createLinearGradient(-S*0.3,0,S*0.3,0);gr.addColorStop(0,rgb(mix(k,BLACK,0.2)));gr.addColorStop(1,rgb(mix(k,WHITE,0.15)));g.fillStyle=gr;g.fill();
+    g.strokeStyle=rgb(mix(k,BLACK,0.4),0.6);g.lineWidth=S*0.018;g.beginPath();g.moveTo(0,-S*0.38);g.lineTo(0,S*0.44);g.stroke();
+    for(let i=-2;i<=2;i++){const y=i*S*0.1;g.beginPath();g.moveTo(0,y);g.lineTo(S*0.16,y-S*0.09);g.moveTo(0,y);g.lineTo(-S*0.16,y-S*0.09);g.stroke()}
+  },64));
+function fallCount(){const n=cfg.snow;switch(cfg.fall){case 'petals':return Math.round(n*0.5);case 'leaves':return Math.round(n*0.22);case 'spiders':return Math.min(30,Math.round(n/14));}return n}
+function newFlake(x,y,tmp,kind){
+  kind=kind||cfg.fall;
+  const r=(0.8+Math.random()*2.2)*cfg.flake;
+  const f={kind,x,y,r,ph:Math.random()*6.283,vy:0.5+r*0.32+Math.random()*0.4,tmp,rot:Math.random()*6.283,vr:(Math.random()-0.5)*0.06,fl:Math.random()*6.283,vf:0.02+Math.random()*0.05};
+  if(kind==='petals'){f.vy=0.5+Math.random()*0.7;f.spr=petalSprites[Math.random()*petalSprites.length|0];f.w=(10+r*5)}
+  if(kind==='leaves'){f.vy=0.7+Math.random()*0.8;f.spr=leafSprites[Math.random()*leafSprites.length|0];f.w=(26+r*9);f.vr*=1.5}
+  if(kind==='spiders'){f.x=40+Math.random()*(VW-80);f.y=-20-Math.random()*500;f.st=0;f.target=60+Math.random()*VH*0.55;f.hold=3+Math.random()*7;f.s=(44+Math.random()*26)*cfg.flake;f.down=0.8+Math.random()*0.8}
+  return f;
+}
 function syncFlakes(){
-  let perm=flakes.filter(f=>!f.tmp);const tmp=flakes.filter(f=>f.tmp);
-  while(perm.length<cfg.snow)perm.push(newFlake(Math.random()*(VW+400)-200,Math.random()*VH,false));
-  perm.length=Math.min(perm.length,cfg.snow);
+  let perm=flakes.filter(f=>!f.tmp&&f.kind===cfg.fall);const tmp=flakes.filter(f=>f.tmp);const N=fallCount();
+  while(perm.length<N){const f=newFlake(Math.random()*(VW+400)-200,Math.random()*VH,false);if(f.kind==='spiders'&&Math.random()<0.5){f.y=Math.random()*f.target;}perm.push(f)}
+  perm.length=Math.min(perm.length,N);
   flakes=perm.concat(tmp);
 }
 function updateFlakes(t){
   const out=[];
   const boxes=cfg.stick?chains.map(ch=>{let a=1e9,b=-1e9;for(const p of ch.P){if(p.y<a)a=p.y;if(p.y>b)b=p.y}return[a-8,b+8]}):[];
   for(const f of flakes){
-    f.y+=f.vy;f.x+=windAt(t,f.x)*30*(0.6+f.r*0.2)+Math.sin(t*1.4+f.ph)*0.35;
-    let gone=f.y>VH+12||f.x<-260||f.x>VW+260;
-    if(!gone&&cfg.stick&&!f.tmp){
+    let gone=false;
+    if(f.kind==='spiders'){
+      if(f.st===0){f.y+=f.down;if(f.y>=f.target)f.st=1}
+      else if(f.st===1){f.hold-=1/60;f.y=f.target+Math.sin(t*1.5+f.ph)*6;if(f.hold<=0)f.st=2}
+      else{f.y-=f.down*1.6;if(f.y<-40)gone=true}
+      if(gone){out.push(newFlake(0,0,false));continue}
+      out.push(f);continue;
+    }
+    if(f.kind==='snow'){f.y+=f.vy;f.x+=windAt(t,f.x)*30*(0.6+f.r*0.2)+Math.sin(t*1.4+f.ph)*0.35}
+    else{
+      const k=f.kind==='leaves'?1.3:1;
+      f.y+=f.vy*(0.75+0.35*Math.sin(t*1.1+f.ph));f.x+=windAt(t,f.x)*38*k+Math.sin(t*0.9+f.ph)*0.9*k;
+      f.rot+=f.vr+windAt(t,f.x)*0.05;f.fl+=f.vf;
+    }
+    gone=f.y>VH+40||f.x<-260||f.x>VW+260;
+    if(!gone&&cfg.stick&&!f.tmp&&f.kind==='snow'){
       for(let c=0;c<chains.length&&!gone;c++){
         if(f.y<boxes[c][0]||f.y>boxes[c][1])continue;
         const P=chains[c].P;
@@ -271,7 +316,7 @@ function updateFlakes(t){
         }
       }
     }
-    if(gone){if(!f.tmp){const n=newFlake(Math.random()*(VW+400)-200,-10-Math.random()*60,false);out.push(n)}}
+    if(gone){if(!f.tmp&&f.kind===cfg.fall){const n=newFlake(Math.random()*(VW+400)-200,-30-Math.random()*60,false);out.push(n)}}
     else out.push(f);
   }
   flakes=out;
@@ -346,8 +391,8 @@ function drawCat(s,br,t,b){
   ctx.strokeStyle='rgba(220,220,230,.35)';ctx.lineWidth=Math.max(0.5,s*0.012);
   for(const sg of [-1,1])for(const k of [-1,1]){ctx.beginPath();ctx.moveTo(sg*r*0.3,cy+r*0.3);ctx.lineTo(sg*r*1.15,cy+r*(0.25+k*0.12));ctx.stroke()}
 }
-function drawSpider(s,br,t,b){
-  const L=s*(1.05+0.25*Math.sin(t*1.3*cfg.speed+b.ph));
+function drawSpider(s,br,t,b,gc,Lfix){
+  const L=Lfix!=null?Lfix:s*(1.05+0.25*Math.sin(t*1.3*cfg.speed+b.ph));
   ctx.strokeStyle='rgba(230,230,240,.55)';ctx.lineWidth=Math.max(0.5,s*0.012);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,L);ctx.stroke();
   const hy=L+s*0.08,ay=L+s*0.3;
   ctx.strokeStyle='#120e16';ctx.lineWidth=Math.max(0.8,s*0.035);ctx.lineCap='round';
@@ -477,7 +522,13 @@ function render(){
     }
   }
   // flakes
-  for(const f of flakes){ctx.globalAlpha=0.45+0.5*Math.min(1,f.r/3);const R=f.r*1.7;ctx.drawImage(flakeSprite,f.x-R,f.y-R,R*2,R*2)}
+  for(const f of flakes){
+    if(f.kind==='snow'){ctx.globalAlpha=0.45+0.5*Math.min(1,f.r/3);const R=f.r*1.7;ctx.drawImage(flakeSprite,f.x-R,f.y-R,R*2,R*2);continue}
+    ctx.globalAlpha=1;ctx.save();
+    if(f.kind==='spiders'){const R=f.s*0.75;ctx.globalCompositeOperation='lighter';ctx.globalAlpha=0.3;ctx.drawImage(glowSprite('#a99cff'),f.x-R,f.y+f.s*0.25-R,R*2,R*2);ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;ctx.translate(f.x,-10);drawSpider(f.s,1,t,f,null,f.y+10);ctx.restore();continue}
+    ctx.translate(f.x,f.y);ctx.rotate(f.rot);ctx.scale(0.25+0.75*Math.abs(Math.cos(f.fl)),1);
+    ctx.globalAlpha=0.92;ctx.drawImage(f.spr,-f.w/2,-f.w/2,f.w,f.w);ctx.restore();
+  }
   ctx.globalAlpha=1;
   if(EDIT)drawEditorMarks();
 }
@@ -560,7 +611,7 @@ function slider(label,key,min,max,stp,fmt,rb){
 }
 function check(label,key,rb){return el('label',{className:'chk'},el('input',{type:'checkbox',checked:!!cfg[key],on:{change:e=>{cfg[key]=e.target.checked;changed(rb)}}}),label)}
 function selectRow(label,key,opts,rb){
-  const s=el('select',{on:{change:e=>{cfg[key]=e.target.value;changed(rb)}}});
+  const s=el('select',{on:{change:e=>{cfg[key]=e.target.value;if(key==='fall'){flakes=[];syncFlakes();for(const ch of chains)for(const q of ch.P)q.snow=0}changed(rb)}}});
   for(const [v,l] of opts)s.append(el('option',{value:v,selected:cfg[key]===v},l));
   return el('div',{className:'row'},el('label',null,el('span',null,label)),s);
 }
@@ -628,9 +679,10 @@ function buildPanel(){
   ));
 
   pn.append(sec('Погода',
-    slider('Снег','snow',0,500,10,v=>v?v+' снежинок':'выкл'),
-    slider('Размер снежинок','flake',0.4,2.5,0.1,v=>v.toFixed(1)+'×'),
-    check('Снег налипает на провод','stick'),
+    selectRow('Что падает','fall',[['snow','Снег'],['spiders','Спускаются паучки'],['petals','Розовые и красные лепестки'],['leaves','Осенние листья']]),
+    slider('Сколько','snow',0,500,10,v=>v?v:'выкл'),
+    slider('Размер','flake',0.4,2.5,0.1,v=>v.toFixed(1)+'×'),
+    check('Снег налипает на провод (только для снега)','stick'),
     slider('Ветер','wind',0,1.5,0.05,v=>Math.round(v*100)+'%'),
     slider('Порывы','gust',0,1.5,0.05,v=>Math.round(v*100)+'%')
   ));
