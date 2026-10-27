@@ -86,7 +86,7 @@ const DEFAULT = {
   mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2,
   wireColor:'#1a2a1e', wire:2.5,
   images:[], imgEvery:1, imgSize:2.2, imgGlow:true,
-  snow:140, flake:1, stick:true, fall:'snow', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
+  snow:140, flake:1, stick:true, fall:'snow', fallAlpha:1, fallSpeed:1, fallDepth:1, fallClear:0, spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
   wind:0.3, gust:0.5, heatLogin:'', heatId:'', heatProvider:'heat', tugPower:1, clickRings:true,
 };
 
@@ -267,6 +267,13 @@ const leafSprites=[].concat(
     for(let i=-2;i<=2;i++){const y=i*S*0.1;g.beginPath();g.moveTo(0,y);g.lineTo(S*0.16,y-S*0.09);g.moveTo(0,y);g.lineTo(-S*0.16,y-S*0.09);g.stroke()}
   },64));
 function spiderDepthAt(x){const u=Math.min(1,Math.abs(x/VW-0.5)*2);let w=Math.max(0,Math.min(1,(u-0.45)/0.4));w=w*w*(3-2*w);const mid=cfg.spiderMid!=null?cfg.spiderMid:cfg.spiderDepth;return mid+(cfg.spiderDepth-mid)*w}
+function fallFade(f){
+  if(f.kind==='spiders')return 1;
+  let a=f.tmp?1:cfg.fallAlpha;
+  if(cfg.fallDepth<1&&!f.tmp){const L=VH*cfg.fallDepth;const st=L*0.55;if(f.y>st)a*=Math.max(0,1-(f.y-st)/(L-st))}
+  if(cfg.fallClear>0&&!f.tmp){const u=Math.abs(f.x/VW-0.5)*2;const c=cfg.fallClear;if(u<c){const e=c*0.55;a*=u<e?0:(u-e)/(c-e)}}
+  return a;
+}
 function fallCount(){const n=cfg.snow;switch(cfg.fall){case 'petals':return Math.round(n*0.5);case 'leaves':return Math.round(n*0.22);case 'spiders':return Math.min(30,Math.round(n/14));}return n}
 function newFlake(x,y,tmp,kind){
   kind=kind||cfg.fall;
@@ -279,7 +286,7 @@ function newFlake(x,y,tmp,kind){
 }
 function syncFlakes(){
   let perm=flakes.filter(f=>!f.tmp&&f.kind===cfg.fall);const tmp=flakes.filter(f=>f.tmp);const N=fallCount();
-  while(perm.length<N){const f=newFlake(Math.random()*(VW+400)-200,Math.random()*VH,false);if(f.kind==='spiders'&&Math.random()<0.5){f.y=Math.random()*f.target;}perm.push(f)}
+  while(perm.length<N){const f=newFlake(Math.random()*(VW+400)-200,Math.random()*VH*Math.min(1,cfg.fallDepth),false);if(f.kind==='spiders'&&Math.random()<0.5){f.y=Math.random()*f.target;}perm.push(f)}
   perm.length=Math.min(perm.length,N);
   flakes=perm.concat(tmp);
 }
@@ -295,13 +302,14 @@ function updateFlakes(t){
       if(gone){if(!f.tmp)out.push(newFlake(0,0,false));continue}
       out.push(f);continue;
     }
-    if(f.kind==='snow'){f.y+=f.vy;f.x+=windAt(t,f.x)*30*(0.6+f.r*0.2)+Math.sin(t*1.4+f.ph)*0.35}
+    const sp=f.tmp?1:cfg.fallSpeed;
+    if(f.kind==='snow'){f.y+=f.vy*sp;f.x+=(windAt(t,f.x)*30*(0.6+f.r*0.2)+Math.sin(t*1.4+f.ph)*0.35)*Math.sqrt(sp)}
     else{
       const k=f.kind==='leaves'?1.3:1;
-      f.y+=f.vy*(0.75+0.35*Math.sin(t*1.1+f.ph));f.x+=windAt(t,f.x)*38*k+Math.sin(t*0.9+f.ph)*0.9*k;
+      f.y+=f.vy*sp*(0.75+0.35*Math.sin(t*1.1+f.ph));f.x+=(windAt(t,f.x)*38*k+Math.sin(t*0.9+f.ph)*0.9*k)*Math.sqrt(sp);
       f.rot+=f.vr+windAt(t,f.x)*0.05;f.fl+=f.vf;
     }
-    gone=f.y>VH+40||f.x<-260||f.x>VW+260;
+    gone=f.y>(cfg.fallDepth<1&&!f.tmp?VH*cfg.fallDepth+20:VH+40)||f.x<-260||f.x>VW+260;
     if(!gone&&cfg.stick&&!f.tmp&&f.kind==='snow'){
       for(let c=0;c<chains.length&&!gone;c++){
         if(f.y<boxes[c][0]||f.y>boxes[c][1])continue;
@@ -525,11 +533,12 @@ function render(){
   }
   // flakes
   for(const f of flakes){
-    if(f.kind==='snow'){ctx.globalAlpha=0.45+0.5*Math.min(1,f.r/3);const R=f.r*1.7;ctx.drawImage(flakeSprite,f.x-R,f.y-R,R*2,R*2);continue}
+    const fa=fallFade(f);if(fa<=0.01)continue;
+    if(f.kind==='snow'){ctx.globalAlpha=(0.45+0.5*Math.min(1,f.r/3))*fa;const R=f.r*1.7;ctx.drawImage(flakeSprite,f.x-R,f.y-R,R*2,R*2);continue}
     ctx.globalAlpha=1;ctx.save();
     if(f.kind==='spiders'){const R=f.s*0.75;ctx.globalCompositeOperation='lighter';ctx.globalAlpha=0.3;ctx.drawImage(glowSprite('#a99cff'),f.x-R,f.y+f.s*0.25-R,R*2,R*2);ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;ctx.translate(f.x,-10);drawSpider(f.s,1,t,f,null,f.y+10);ctx.restore();continue}
     ctx.translate(f.x,f.y);ctx.rotate(f.rot);ctx.scale(0.25+0.75*Math.abs(Math.cos(f.fl)),1);
-    ctx.globalAlpha=0.92;ctx.drawImage(f.spr,-f.w/2,-f.w/2,f.w,f.w);ctx.restore();
+    ctx.globalAlpha=0.92*fa;ctx.drawImage(f.spr,-f.w/2,-f.w/2,f.w,f.w);ctx.restore();
   }
   ctx.globalAlpha=1;
   for(const d of drags.values()){ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.arc(d.p.x,d.p.y,5,0,6.283);ctx.fill();ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(d.p.x,d.p.y,11,0,6.283);ctx.stroke()}
@@ -610,7 +619,7 @@ function el(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(
 function sec(title,...kids){return el('div',{className:'sec'},el('h2',null,title),...kids)}
 function slider(label,key,min,max,stp,fmt,rb){
   const val=el('span',null,fmt(cfg[key]));
-  const inp=el('input',{type:'range',min,max,step:stp,value:cfg[key],on:{input:e=>{cfg[key]=+e.target.value;val.textContent=fmt(cfg[key]);if(key==='snow'||key==='flake'||key==='spiderDepth'||key==='spiderMid'){if(key!=='snow')flakes=[];syncFlakes()}changed(rb)}}});
+  const inp=el('input',{type:'range',min,max,step:stp,value:cfg[key],on:{input:e=>{cfg[key]=+e.target.value;val.textContent=fmt(cfg[key]);if(key==='snow'||key==='flake'||key==='spiderDepth'||key==='spiderMid'||key==='fallDepth'){if(key!=='snow')flakes=[];syncFlakes()}changed(rb)}}});
   return el('div',{className:'row'},el('label',null,el('span',null,label),val),inp);
 }
 function check(label,key,rb){return el('label',{className:'chk'},el('input',{type:'checkbox',checked:!!cfg[key],on:{change:e=>{cfg[key]=e.target.checked;changed(rb)}}}),label)}
@@ -689,6 +698,10 @@ function buildPanel(){
     slider('Паучки в середине спускаются','spiderMid',0.03,0.9,0.01,v=>'до '+Math.round(v*100)+'% экрана'),
     slider('Сколько','snow',0,500,10,v=>v?v:'выкл'),
     slider('Размер','flake',0.4,2.5,0.1,v=>v.toFixed(1)+'×'),
+    slider('Прозрачность','fallAlpha',0.1,1,0.05,v=>Math.round(v*100)+'%'),
+    slider('Скорость падения','fallSpeed',0.2,2.5,0.05,v=>v.toFixed(2)+'×'),
+    slider('Докуда долетает','fallDepth',0.1,1,0.05,v=>v>=1?'до низа':'тает на '+Math.round(v*100)+'% экрана'),
+    slider('Пустая зона в центре','fallClear',0,0.9,0.05,v=>v?Math.round(v*100)+'% ширины':'нет'),
     check('Снег налипает на провод (только для снега)','stick'),
     slider('Ветер','wind',0,1.5,0.05,v=>Math.round(v*100)+'%'),
     slider('Порывы','gust',0,1.5,0.05,v=>Math.round(v*100)+'%')
