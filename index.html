@@ -87,7 +87,7 @@ const DEFAULT = {
   wireColor:'#1a2a1e', wire:2.5,
   images:[], imgEvery:1, imgSize:2.2, imgGlow:true,
   snow:140, flake:1, stick:true, fall:'snow',
-  wind:0.3, gust:0.5, heatLogin:'', heatId:'', tugPower:1, clickRings:true,
+  wind:0.3, gust:0.5, heatLogin:'', heatId:'', heatProvider:'heat', tugPower:1, clickRings:true,
 };
 
 /* ---------- config load/save ---------- */
@@ -171,6 +171,7 @@ function makeChain(A,src){
   return {P,L,src};
 }
 function build(){
+  if(typeof drags!=='undefined')drags.clear();
   chains=[];bulbs=[];let gi=0;
   cfg.shape.forEach((s,idx)=>{const A=anchorsOf(s);if(A&&A.length>1)chains.push(makeChain(A,idx))});
   const useImg=imgs.length>0;
@@ -205,7 +206,7 @@ function step(dt,settle){
   for(const ch of chains){
     for(const p of ch.P){
       if(p.pin)continue;
-      if(p.grab){p.px=p.x;p.py=p.y;p.x=mouse.x;p.y=mouse.y;continue}
+      if(p.grab){const v=p.tx!=null;const tx=v?p.tx:mouse.x,ty=v?p.ty:mouse.y,k=v?0.3:1;p.px=p.x;p.py=p.y;p.x+=(tx-p.x)*k;p.y+=(ty-p.y)*k;continue}
       const vx=(p.x-p.px)*0.985,vy=(p.y-p.py)*0.985;p.px=p.x;p.py=p.y;
       p.x+=vx+(settle?0:windAt(t,p.x)*0.6);p.y+=vy+G*(1+p.snow*0.5);
     }
@@ -530,6 +531,7 @@ function render(){
     ctx.globalAlpha=0.92;ctx.drawImage(f.spr,-f.w/2,-f.w/2,f.w,f.w);ctx.restore();
   }
   ctx.globalAlpha=1;
+  for(const d of drags.values()){ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.arc(d.p.x,d.p.y,5,0,6.283);ctx.fill();ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(d.p.x,d.p.y,11,0,6.283);ctx.stroke()}
   for(const r of rings){const k=r.life;ctx.strokeStyle=`rgba(255,255,255,${0.7*k})`;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(r.x,r.y,(1-k)*38+6,0,6.283);ctx.stroke()}
   if(EDIT)drawEditorMarks();
 }
@@ -612,7 +614,7 @@ function slider(label,key,min,max,stp,fmt,rb){
 }
 function check(label,key,rb){return el('label',{className:'chk'},el('input',{type:'checkbox',checked:!!cfg[key],on:{change:e=>{cfg[key]=e.target.checked;changed(rb)}}}),label)}
 function selectRow(label,key,opts,rb){
-  const s=el('select',{on:{change:e=>{cfg[key]=e.target.value;if(key==='fall'){flakes=[];syncFlakes();for(const ch of chains)for(const q of ch.P)q.snow=0}changed(rb)}}});
+  const s=el('select',{on:{change:e=>{cfg[key]=e.target.value;if(key==='heatProvider'){setTimeout(()=>document.querySelector('#heatconnect')?.click(),0)}if(key==='fall'){flakes=[];syncFlakes();for(const ch of chains)for(const q of ch.P)q.snow=0}changed(rb)}}});
   for(const [v,l] of opts)s.append(el('option',{value:v,selected:cfg[key]===v},l));
   return el('div',{className:'row'},el('label',null,el('span',null,label)),s);
 }
@@ -693,17 +695,21 @@ function buildPanel(){
   const connect=async()=>{
     const v=login.value.trim().replace(/^@/,'').toLowerCase();cfg.heatLogin=v;
     if(!v){cfg.heatId='';save();heatConnect();return}
+    if(cfg.heatProvider==='green'){save();heatConnect();return}
     if(/^\d+$/.test(v))cfg.heatId=v;
     else{st.textContent='Ищу канал…';try{const r=await fetch('https://decapi.me/twitch/id/'+encodeURIComponent(v));const t=(await r.text()).trim();if(!/^\d+$/.test(t)){st.textContent='Канал не найден, проверь ник';return}cfg.heatId=t}catch(e){st.textContent='Не получилось найти канал, попробуй ещё раз';return}}
     save();heatConnect();
   };
   pn.append(sec('Дёргать со стрима',
-    el('p',{className:'note'},'Зрители кликают по трансляции и дёргают провод. Нужно бесплатное расширение ',el('b',null,'Heat'),' на твоём канале Twitch: Панель автора → Расширения → найди Heat → Установить → Активировать как «Оверлей».'),
-    login,el('div',{className:'btns'},el('button',{className:'wide',textContent:'Подключить',on:{click:connect}})),st,
+    el('p',{className:'note'},'Зрители дёргают провод мышкой прямо на трансляции. Нужно бесплатное Twitch-расширение на твоём канале (Панель автора → Расширения → найти → Установить → Активировать как «Оверлей»):'),
+    el('p',{className:'note'},el('b',null,'Heat'),' — только клики: клик рядом с проводом его дёргает.',el('br'),el('b',null,'GreenHeat'),' — клики и перетаскивание: зажал провод, потянул, отпустил.'),
+    selectRow('Какое расширение стоит на канале','heatProvider',[['heat','Heat (клики)'],['green','GreenHeat (клики и перетаскивание)']]),
+    login,el('div',{className:'btns'},el('button',{className:'wide',id:'heatconnect',textContent:'Подключить',on:{click:connect}})),st,
     slider('Сила рывка','tugPower',0.3,3,0.1,v=>v.toFixed(1)+'×'),
     check('Показывать кружок на месте клика','clickRings'),
     el('div',{className:'btns'},el('button',{className:'wide',textContent:'Проверить: случайный клик зрителя',on:{click:()=>{const ch=chains[Math.random()*chains.length|0];if(!ch)return;const p=ch.P[Math.random()*ch.P.length|0];tugAt(p.x+(Math.random()-0.5)*40,p.y+(Math.random()-0.5)*40)}}})),
-    el('p',{className:'note'},'Работает у зрителей, которые смотрят с компьютера в браузере. В мобильном приложении Twitch расширения не показываются. Из-за задержки трансляции рывок происходит через пару секунд после клика.')
+    el('div',{className:'btns'},el('button',{className:'wide',textContent:'Проверить: зритель тянет провод',on:{click:demoDrag}})),
+    el('p',{className:'note'},'Работает у зрителей, которые смотрят с компьютера в браузере. Из-за задержки трансляции провод реагирует через пару секунд.')
   ));
   heatStatus();
 
@@ -739,15 +745,37 @@ function tugAt(x,y,power){
   for(const b of bulbs)if(b.ch===best.ch&&Math.abs(b.i-best.i)<=9){b.px=b.x-vx*1.3;b.py=b.y-vy*1.3}
   return true;
 }
-function stepRings(){for(const r of rings)r.life-=1/45;rings=rings.filter(r=>r.life>0)}
+const drags=new Map();
+function dragAt(id,x,y){
+  let d=drags.get(id);
+  if(!d){
+    let best=null,bd=130;
+    for(const ch of chains)for(const p of ch.P){if(p.pin||p.grab)continue;const dd=Math.hypot(p.x-x,p.y-y);if(dd<bd){bd=dd;best=p}}
+    if(!best)return;
+    d={p:best,sx:best.x,sy:best.y};best.grab=true;drags.set(id,d);
+  }
+  let dx=x-d.sx,dy=y-d.sy;const L=Math.hypot(dx,dy),M=220*Math.max(0.5,cfg.tugPower);if(L>M){dx*=M/L;dy*=M/L}
+  d.p.tx=d.sx+dx;d.p.ty=d.sy+dy;d.last=performance.now();
+}
+function releaseDrag(id){const d=drags.get(id);if(!d)return;d.p.grab=false;d.p.tx=d.p.ty=null;drags.delete(id)}
+function stepRings(){
+  for(const r of rings)r.life-=1/45;rings=rings.filter(r=>r.life>0);
+  const now=performance.now();for(const [id,d] of drags)if(now-d.last>1500)releaseDrag(id);
+}
+function demoDrag(){
+  const ch=chains[Math.random()*chains.length|0];if(!ch)return;const p=ch.P[(ch.P.length*(0.2+Math.random()*0.6))|0];
+  const id='demo'+Math.random(),sx=p.x,sy=p.y,ang=Math.random()*Math.PI;let k=0;
+  const iv=setInterval(()=>{k++;dragAt(id,sx+Math.cos(ang)*k*14,sy+Math.abs(Math.sin(ang))*k*14);if(k>=12){clearInterval(iv);setTimeout(()=>releaseDrag(id),300)}},80);
+}
 function heatConnect(){
   if(heatWs){try{heatWs.onclose=null;heatWs.close()}catch(e){}heatWs=null}
-  if(!cfg.heatId){heatState='off';heatStatus();return}
+  const green=cfg.heatProvider==='green';
+  if(green?!cfg.heatLogin:!cfg.heatId){heatState='off';heatStatus();return}
   heatState='connecting';heatStatus();
-  let ws;try{ws=new WebSocket('wss://heat-api.j38.net/channel/'+encodeURIComponent(cfg.heatId))}catch(e){heatState='error';heatStatus();return}
+  let ws;try{ws=new WebSocket(green?'wss://heat.prod.kr/'+encodeURIComponent(cfg.heatLogin):'wss://heat-api.j38.net/channel/'+encodeURIComponent(cfg.heatId))}catch(e){heatState='error';heatStatus();return}
   heatWs=ws;
   ws.onopen=()=>{heatState='on';heatRetry=0;heatStatus()};
-  ws.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='click'){const x=parseFloat(m.x),y=parseFloat(m.y);if(isFinite(x)&&isFinite(y))tugAt(x*VW,y*VH)}}catch(err){}};
+  ws.onmessage=e=>{try{const m=JSON.parse(e.data);const x=parseFloat(m.x)*VW,y=parseFloat(m.y)*VH,id=String(m.id||'anon');if(m.type==='release'){releaseDrag(id);return}if(!isFinite(x)||!isFinite(y))return;if(m.type==='click'){if(!drags.has(id))tugAt(x,y)}else if(m.type==='drag')dragAt(id,x,y)}catch(err){}};
   ws.onclose=()=>{heatState='error';heatStatus();heatWs=null;clearTimeout(heatConnect.t);heatConnect.t=setTimeout(heatConnect,Math.min(30000,2000*(++heatRetry)))};
 }
 function heatStatus(){const el=document.getElementById('heatst');if(!el)return;el.textContent={off:'Не подключено',connecting:'Подключаюсь…',on:'✓ Подключено — клики зрителей будут приходить',error:'Нет связи с Heat, пробую ещё раз…'}[heatState]}
