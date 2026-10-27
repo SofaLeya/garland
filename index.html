@@ -87,7 +87,7 @@ const DEFAULT = {
   wireColor:'#1a2a1e', wire:2.5,
   images:[], imgEvery:1, imgSize:2.2, imgGlow:true,
   snow:140, flake:1, stick:true, fall:'snow',
-  wind:0.3, gust:0.5,
+  wind:0.3, gust:0.5, heatLogin:'', heatId:'', tugPower:1, clickRings:true,
 };
 
 /* ---------- config load/save ---------- */
@@ -290,7 +290,7 @@ function updateFlakes(t){
       if(f.st===0){f.y+=f.down;if(f.y>=f.target)f.st=1}
       else if(f.st===1){f.hold-=1/60;f.y=f.target+Math.sin(t*1.5+f.ph)*6;if(f.hold<=0)f.st=2}
       else{f.y-=f.down*1.6;if(f.y<-40)gone=true}
-      if(gone){out.push(newFlake(0,0,false));continue}
+      if(gone){if(!f.tmp)out.push(newFlake(0,0,false));continue}
       out.push(f);continue;
     }
     if(f.kind==='snow'){f.y+=f.vy;f.x+=windAt(t,f.x)*30*(0.6+f.r*0.2)+Math.sin(t*1.4+f.ph)*0.35}
@@ -530,6 +530,7 @@ function render(){
     ctx.globalAlpha=0.92;ctx.drawImage(f.spr,-f.w/2,-f.w/2,f.w,f.w);ctx.restore();
   }
   ctx.globalAlpha=1;
+  for(const r of rings){const k=r.life;ctx.strokeStyle=`rgba(255,255,255,${0.7*k})`;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(r.x,r.y,(1-k)*38+6,0,6.283);ctx.stroke()}
   if(EDIT)drawEditorMarks();
 }
 
@@ -539,7 +540,7 @@ function frame(now){
   acc+=Math.min(0.1,(now-last)/1000);last=now;
   let n=0;while(acc>=1/60&&n<4){step(1/60,false);acc-=1/60;n++}
   if(n===4)acc=0;
-  render();requestAnimationFrame(frame);
+  stepRings();render();requestAnimationFrame(frame);
 }
 
 function resize(){
@@ -687,6 +688,25 @@ function buildPanel(){
     slider('Порывы','gust',0,1.5,0.05,v=>Math.round(v*100)+'%')
   ));
 
+  const login=el('input',{value:cfg.heatLogin||'',placeholder:'ник канала, например moon1rose',style:'width:100%;background:#15121b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;margin-bottom:8px'});
+  const st=el('p',{className:'note',id:'heatst'});
+  const connect=async()=>{
+    const v=login.value.trim().replace(/^@/,'').toLowerCase();cfg.heatLogin=v;
+    if(!v){cfg.heatId='';save();heatConnect();return}
+    if(/^\d+$/.test(v))cfg.heatId=v;
+    else{st.textContent='Ищу канал…';try{const r=await fetch('https://decapi.me/twitch/id/'+encodeURIComponent(v));const t=(await r.text()).trim();if(!/^\d+$/.test(t)){st.textContent='Канал не найден, проверь ник';return}cfg.heatId=t}catch(e){st.textContent='Не получилось найти канал, попробуй ещё раз';return}}
+    save();heatConnect();
+  };
+  pn.append(sec('Дёргать со стрима',
+    el('p',{className:'note'},'Зрители кликают по трансляции и дёргают провод. Нужно бесплатное расширение ',el('b',null,'Heat'),' на твоём канале Twitch: Панель автора → Расширения → найди Heat → Установить → Активировать как «Оверлей».'),
+    login,el('div',{className:'btns'},el('button',{className:'wide',textContent:'Подключить',on:{click:connect}})),st,
+    slider('Сила рывка','tugPower',0.3,3,0.1,v=>v.toFixed(1)+'×'),
+    check('Показывать кружок на месте клика','clickRings'),
+    el('div',{className:'btns'},el('button',{className:'wide',textContent:'Проверить: случайный клик зрителя',on:{click:()=>{const ch=chains[Math.random()*chains.length|0];if(!ch)return;const p=ch.P[Math.random()*ch.P.length|0];tugAt(p.x+(Math.random()-0.5)*40,p.y+(Math.random()-0.5)*40)}}})),
+    el('p',{className:'note'},'Работает у зрителей, которые смотрят с компьютера в браузере. В мобильном приложении Twitch расширения не показываются. Из-за задержки трансляции рывок происходит через пару секунд после клика.')
+  ));
+  heatStatus();
+
   const bgFile=el('input',{type:'file',accept:'image/*',style:'display:none',on:{change:e=>{const f=e.target.files[0];if(!f)return;const fr=document.getElementById('frame');fr.className='';fr.style.backgroundImage=`url(${URL.createObjectURL(f)})`}}});
   const setBg=c=>{const fr=document.getElementById('frame');fr.style.backgroundImage='';fr.className=c};
   pn.append(sec('Фон превью',
@@ -705,10 +725,37 @@ function buildPanel(){
   ));
 }
 
+/* ---------- viewer clicks (Heat extension) ---------- */
+let rings=[],heatWs=null,heatState='off',heatRetry=0;
+function tugAt(x,y,power){
+  power=power==null?cfg.tugPower:power;
+  if(cfg.clickRings)rings.push({x,y,life:1});
+  let best=null,bd=170;
+  for(const ch of chains)ch.P.forEach((p,i)=>{const d=Math.hypot(p.x-x,p.y-y);if(d<bd){bd=d;best={ch,i}}});
+  if(!best)return false;
+  const P=best.ch.P;const str=13*power*(1-bd/240);
+  const vy=(Math.random()<0.5?-1:0.7)*str,vx=(Math.random()-0.5)*str*1.2;
+  for(let k=-9;k<=9;k++){const q=P[best.i+k];if(!q||q.pin)continue;const f=1-Math.abs(k)/10;q.px=q.x-vx*f;q.py=q.y-vy*f}
+  for(const b of bulbs)if(b.ch===best.ch&&Math.abs(b.i-best.i)<=9){b.px=b.x-vx*1.3;b.py=b.y-vy*1.3}
+  return true;
+}
+function stepRings(){for(const r of rings)r.life-=1/45;rings=rings.filter(r=>r.life>0)}
+function heatConnect(){
+  if(heatWs){try{heatWs.onclose=null;heatWs.close()}catch(e){}heatWs=null}
+  if(!cfg.heatId){heatState='off';heatStatus();return}
+  heatState='connecting';heatStatus();
+  let ws;try{ws=new WebSocket('wss://heat-api.j38.net/channel/'+encodeURIComponent(cfg.heatId))}catch(e){heatState='error';heatStatus();return}
+  heatWs=ws;
+  ws.onopen=()=>{heatState='on';heatRetry=0;heatStatus()};
+  ws.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='click'){const x=parseFloat(m.x),y=parseFloat(m.y);if(isFinite(x)&&isFinite(y))tugAt(x*VW,y*VH)}}catch(err){}};
+  ws.onclose=()=>{heatState='error';heatStatus();heatWs=null;clearTimeout(heatConnect.t);heatConnect.t=setTimeout(heatConnect,Math.min(30000,2000*(++heatRetry)))};
+}
+function heatStatus(){const el=document.getElementById('heatst');if(!el)return;el.textContent={off:'Не подключено',connecting:'Подключаюсь…',on:'✓ Подключено — клики зрителей будут приходить',error:'Нет связи с Heat, пробую ещё раз…'}[heatState]}
+
 /* ---------- start ---------- */
 loadImages();
 if(EDIT)initEditor();
-resize();build();syncFlakes();
+resize();build();syncFlakes();heatConnect();
 addEventListener('resize',()=>{const oldVH=VH;resize();if(VH!==oldVH){build();flakes=[];syncFlakes()}});
 if(EDIT)new ResizeObserver(()=>resize()).observe(document.getElementById('wrap'));
 requestAnimationFrame(frame);
