@@ -86,7 +86,7 @@ const DEFAULT = {
   mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2,
   wireColor:'#1a2a1e', wire:2.5,
   images:[], imgEvery:1, imgSize:2.2, imgGlow:true,
-  snow:140, flake:1, stick:true, fall:'snow', spiderDepth:0.25, spiderThread:1,
+  snow:140, flake:1, stick:true, fall:'snow', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
   wind:0.3, gust:0.5, heatLogin:'', heatId:'', heatProvider:'heat', tugPower:1, clickRings:true,
 };
 
@@ -266,6 +266,7 @@ const leafSprites=[].concat(
     g.strokeStyle=rgb(mix(k,BLACK,0.4),0.6);g.lineWidth=S*0.018;g.beginPath();g.moveTo(0,-S*0.38);g.lineTo(0,S*0.44);g.stroke();
     for(let i=-2;i<=2;i++){const y=i*S*0.1;g.beginPath();g.moveTo(0,y);g.lineTo(S*0.16,y-S*0.09);g.moveTo(0,y);g.lineTo(-S*0.16,y-S*0.09);g.stroke()}
   },64));
+function spiderDepthAt(x){const u=Math.min(1,Math.abs(x/VW-0.5)*2);let w=Math.max(0,Math.min(1,(u-0.45)/0.4));w=w*w*(3-2*w);const mid=cfg.spiderMid!=null?cfg.spiderMid:cfg.spiderDepth;return mid+(cfg.spiderDepth-mid)*w}
 function fallCount(){const n=cfg.snow;switch(cfg.fall){case 'petals':return Math.round(n*0.5);case 'leaves':return Math.round(n*0.22);case 'spiders':return Math.min(30,Math.round(n/14));}return n}
 function newFlake(x,y,tmp,kind){
   kind=kind||cfg.fall;
@@ -273,7 +274,7 @@ function newFlake(x,y,tmp,kind){
   const f={kind,x,y,r,ph:Math.random()*6.283,vy:0.5+r*0.32+Math.random()*0.4,tmp,rot:Math.random()*6.283,vr:(Math.random()-0.5)*0.06,fl:Math.random()*6.283,vf:0.02+Math.random()*0.05};
   if(kind==='petals'){f.vy=0.5+Math.random()*0.7;f.spr=petalSprites[Math.random()*petalSprites.length|0];f.w=(10+r*5)}
   if(kind==='leaves'){f.vy=0.7+Math.random()*0.8;f.spr=leafSprites[Math.random()*leafSprites.length|0];f.w=(26+r*9);f.vr*=1.5}
-  if(kind==='spiders'){f.x=40+Math.random()*(VW-80);f.y=-20-Math.random()*500;f.st=0;f.target=40+Math.random()*VH*cfg.spiderDepth;f.hold=3+Math.random()*7;f.s=(44+Math.random()*26)*cfg.flake;f.down=0.8+Math.random()*0.8}
+  if(kind==='spiders'){f.x=40+Math.random()*(VW-80);f.y=-20-Math.random()*500;f.st=0;f.target=40+Math.random()*VH*spiderDepthAt(f.x);f.hold=3+Math.random()*7;f.s=(44+Math.random()*26)*cfg.flake;f.down=0.8+Math.random()*0.8}
   return f;
 }
 function syncFlakes(){
@@ -609,7 +610,7 @@ function el(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(
 function sec(title,...kids){return el('div',{className:'sec'},el('h2',null,title),...kids)}
 function slider(label,key,min,max,stp,fmt,rb){
   const val=el('span',null,fmt(cfg[key]));
-  const inp=el('input',{type:'range',min,max,step:stp,value:cfg[key],on:{input:e=>{cfg[key]=+e.target.value;val.textContent=fmt(cfg[key]);if(key==='snow'||key==='flake'||key==='spiderDepth'){if(key!=='snow')flakes=[];syncFlakes()}changed(rb)}}});
+  const inp=el('input',{type:'range',min,max,step:stp,value:cfg[key],on:{input:e=>{cfg[key]=+e.target.value;val.textContent=fmt(cfg[key]);if(key==='snow'||key==='flake'||key==='spiderDepth'||key==='spiderMid'){if(key!=='snow')flakes=[];syncFlakes()}changed(rb)}}});
   return el('div',{className:'row'},el('label',null,el('span',null,label),val),inp);
 }
 function check(label,key,rb){return el('label',{className:'chk'},el('input',{type:'checkbox',checked:!!cfg[key],on:{change:e=>{cfg[key]=e.target.checked;changed(rb)}}}),label)}
@@ -684,7 +685,8 @@ function buildPanel(){
 
   pn.append(sec('Погода',
     selectRow('Что падает','fall',[['snow','Снег'],['spiders','Спускаются паучки'],['petals','Розовые и красные лепестки'],['leaves','Осенние листья']]),
-    slider('Как низко спускаются паучки','spiderDepth',0.05,0.8,0.05,v=>'до '+Math.round(v*100)+'% экрана'),
+    slider('Паучки по краям спускаются','spiderDepth',0.05,0.9,0.05,v=>'до '+Math.round(v*100)+'% экрана'),
+    slider('Паучки в середине спускаются','spiderMid',0.03,0.9,0.01,v=>'до '+Math.round(v*100)+'% экрана'),
     slider('Сколько','snow',0,500,10,v=>v?v:'выкл'),
     slider('Размер','flake',0.4,2.5,0.1,v=>v.toFixed(1)+'×'),
     check('Снег налипает на провод (только для снега)','stick'),
