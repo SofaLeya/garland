@@ -171,6 +171,7 @@ function makeChain(A,src){
   return {P,L,src};
 }
 function build(){
+  {const v=document.getElementById('layersval');if(v)v.textContent=cfg.shape.filter(s=>s.layer).length}
   if(typeof drags!=='undefined')drags.clear();
   chains=[];bulbs=[];let gi=0;
   cfg.shape.forEach((s,idx)=>{const A=anchorsOf(s);if(A&&A.length>1)chains.push(makeChain(A,idx))});
@@ -746,11 +747,21 @@ function selectRow(label,key,opts,rb){
   for(const [v,l] of opts)s.append(el('option',{value:v,selected:cfg[key]===v},l));
   return el('div',{className:'row'},el('label',null,el('span',null,label)),s);
 }
+const LAYER_SPANS=[0.26,0.25,0.33,0.2,0.29,0.22,0.36];
+function layerPath(i){
+  const span=LAYER_SPANS[i%LAYER_SPANS.length],off=((i*0.37)%1)*span;
+  const p=[];let k=0;for(let x=-span+off-0.05;x<1+span;x+=span,k++)p.push([+x.toFixed(4),(k+i)%2?0:-0.012]);
+  return {t:'p',p,layer:true};
+}
+function setLayers(n){
+  const others=cfg.shape.filter(s=>!s.layer);
+  cfg.shape=others.concat(Array.from({length:n},(_,i)=>layerPath(i)));
+  building=-1;build();save();
+  const v=document.getElementById('layersval');if(v)v.textContent=n;
+}
 function applyCozy(){
   Object.assign(cfg,{spiderLook:'cute',style:'cozy',vine:true,wireColor:'#6b5548',wire:2,sag:0.06,bulbGap:30,fall:'leaves',snow:60,fallAlpha:0.85,fallDepth:0.45,fallSpeed:0.7,stick:false,bulbSize:13,figSize:2,mode:'twinkle',speed:0.5,glow:0.9,
-    shape:[{t:'p',p:[[-0.06,-0.012],[0.2,0.0],[0.46,-0.012],[0.72,0.0],[0.98,-0.012],[1.2,0.0]]},
-           {t:'p',p:[[-0.15,0.0],[0.08,-0.012],[0.33,0.0],[0.59,-0.012],[0.85,0.0],[1.1,-0.012]]},
-           {t:'p',p:[[-0.15,-0.012],[0.17,0.0],[0.5,-0.012],[0.83,0.0],[1.15,-0.012]]}]});
+    shape:[0,1,2].map(layerPath)});
   building=-1;build();flakes=[];syncFlakes();save();buildPanel();
 }
 function setPreset(kind){
@@ -784,6 +795,9 @@ function buildPanel(){
       el('button',{textContent:'Низ',on:{click:()=>setPreset('bottom')}}),
       el('button',{textContent:'✦ Готовый стиль: уютная осень',on:{click:applyCozy}}),
       el('button',{textContent:'Очистить',on:{click:()=>{cfg.shape=[];building=-1;changed(true)}}})),
+    (()=>{const n=cfg.shape.filter(s=>s.layer).length;const val=el('span',{id:'layersval'},String(n));
+      return el('div',{className:'row'},el('label',null,el('span',null,'Проводов по верху (слоями внахлёст)'),val),
+        el('div',{className:'btns'},el('button',{textContent:'− убрать провод',on:{click:()=>{const k=cfg.shape.filter(s=>s.layer).length;if(k>0)setLayers(k-1)}}}),el('button',{textContent:'+ добавить провод',on:{click:()=>{const k=cfg.shape.filter(s=>s.layer).length;if(k<7)setLayers(k+1)}}})))})(),
     slider('Провис','sag',0,0.35,0.005,v=>Math.round(v*100)+'%',true),
     slider('Расстояние между креплениями','spacing',120,800,10,v=>v+' px',true),
     el('p',{className:'note'},'Форму можно нарисовать мышкой прямо на превью: инструменты над картинкой.')
