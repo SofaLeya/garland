@@ -85,7 +85,7 @@ const DEFAULT = {
   palette:PALETTES['Классика'].slice(),
   mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false,
   wireColor:'#1a2a1e', wire:2.5,
-  images:[], imgEvery:1, imgSize:2.2, imgGlow:true,
+  images:[], imgModes:[], imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
   snow:140, flake:1, stick:true, fall:'snow', fallAlpha:1, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
   wind:0.3, gust:0.5, heatLogin:'', heatId:'', heatProvider:'heat', tugPower:1, clickRings:true,
 };
@@ -191,27 +191,38 @@ function makeChain(A,src){
   }
   return {P,L,src};
 }
+function imgMode(i){return (cfg.imgModes&&cfg.imgModes[i])||(cfg.imgEvery>1?'every':'all')}
+function assignImages(T){
+  const at=new Array(T).fill(-1);if(!imgs.length||!T)return at;
+  const once=[],all=[],every=[];imgs.forEach((_,i)=>{const m=imgMode(i);(m==='once'?once:m==='all'?all:every).push(i)});
+  once.forEach((ii,j)=>{let k=Math.min(T-1,Math.floor(((cfg.imgPos+j/once.length)%1)*T));let tries=0;while(at[k]>=0&&tries<T){k=(k+1)%T;tries++}at[k]=ii});
+  const pool=all.length?all.concat(every):every;if(!pool.length)return at;
+  const N=all.length?1:Math.max(2,cfg.imgEvery);let c=0,r=0;
+  for(let k=0;k<T;k++){if(at[k]>=0)continue;if(r%N===0){at[k]=pool[c%pool.length];c++}r++}
+  return at;
+}
 function build(){
   {const v=document.getElementById('layersval');if(v)v.textContent=cfg.shape.filter(s=>s.layer).length}
   if(typeof drags!=='undefined')drags.clear();
   chains=[];bulbs=[];let gi=0;
   cfg.shape.forEach((s,idx)=>{const A=anchorsOf(s);if(A&&A.length>1)chains.push(makeChain(A,idx))});
-  const useImg=imgs.length>0;
+  const slots=[];
   for(const ch of chains){
     let acc=cfg.bulbGap*0.5;
-    for(let i=1;i<ch.P.length;i++){
-      acc+=ch.L[i-1];
-      if(acc>=cfg.bulbGap&&!ch.P[i].pin){
-        acc=0;const p=ch.P[i];
-        const isImg=useImg&&(gi%Math.max(1,cfg.imgEvery)===0);
+    for(let i=1;i<ch.P.length;i++){acc+=ch.L[i-1];if(acc>=cfg.bulbGap&&!ch.P[i].pin){acc=0;slots.push({ch,i})}}
+  }
+  const imgAt=assignImages(slots.length);
+  for(const sl of slots){
+      {const ch=sl.ch,i=sl.i;
+        const p=ch.P[i];
+        const imgIdx=imgAt[gi];const isImg=imgIdx>=0;
         const kind=isImg?'img':figureOf(gi);
         const s=cfg.bulbSize*(isImg?cfg.imgSize:kind==='bulb'?1:cfg.figSize*(FIG[kind].sz||1));
         const cordL=FIG[kind].cord?s*(0.6+hash(gi*3.7)*1.1):0;
         const len=kind==='spider'?s*(0.35+1.05*cfg.spiderThread):FIG[kind].cord?cordL+s*(kind==='edison'?0.75:0.55):s*FIG[kind].len;
-        bulbs.push({ch,i,x:p.x,y:p.y+len,px:p.x,py:p.y+len,len,s,gi,kind,cord:cordL,img:isImg?(Math.floor(gi/Math.max(1,cfg.imgEvery))%imgs.length):-1,ph:Math.random()*6.283,fr:0.6+Math.random()*0.9});
+        bulbs.push({ch,i,x:p.x,y:p.y+len,px:p.x,py:p.y+len,len,s,gi,kind,cord:cordL,img:imgIdx,ph:Math.random()*6.283,fr:0.6+Math.random()*0.9});
         gi++;
       }
-    }
   }
   const keepT=simT;
   for(let k=0;k<260;k++)step(0,true);
@@ -844,15 +855,20 @@ function buildPanel(){
   ));
 
   const thumbs=el('div',{className:'thumbs'});
-  const drawThumbs=()=>{thumbs.innerHTML='';cfg.images.forEach((src,i)=>thumbs.append(el('div',{className:'th'},el('img',{src}),el('b',{textContent:'×',on:{click:()=>{cfg.images.splice(i,1);loadImages();drawThumbs();changed(true)}}}))))};drawThumbs();
-  const file=el('input',{type:'file',accept:'image/*',multiple:true,style:'display:none',on:{change:async e=>{for(const f of e.target.files){const d=(f.type==='image/gif'&&f.size<1500000)?await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)}):await shrinkImage(f);if(d)cfg.images.push(d)}e.target.value='';loadImages();drawThumbs();changed(true)}}});
+  const drawThumbs=()=>{thumbs.innerHTML='';cfg.images.forEach((src,i)=>{
+    const sel=el('select',{style:'width:96px;padding:3px;font-size:11px;margin-top:4px',on:{change:e=>{cfg.imgModes=cfg.imgModes||[];cfg.imgModes[i]=e.target.value;changed(true)}}});
+    for(const [v,l] of [['once','одна штука'],['every','каждая N-я'],['all','вместо всех']])sel.append(el('option',{value:v,selected:imgMode(i)===v},l));
+    thumbs.append(el('div',{style:'display:flex;flex-direction:column;align-items:center'},el('div',{className:'th',style:'width:96px;height:64px'},el('img',{src,style:'max-width:88px;max-height:56px'}),el('b',{textContent:'×',on:{click:()=>{cfg.images.splice(i,1);if(cfg.imgModes)cfg.imgModes.splice(i,1);loadImages();drawThumbs();changed(true)}}})),sel));
+  })};drawThumbs();
+  const file=el('input',{type:'file',accept:'image/*',multiple:true,style:'display:none',on:{change:async e=>{for(const f of e.target.files){const d=(f.type==='image/gif'&&f.size<1500000)?await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)}):await shrinkImage(f);if(d){cfg.images.push(d);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once'}}e.target.value='';loadImages();drawThumbs();changed(true)}}});
   pn.append(sec('Свои картинки',
     el('p',{className:'note'},'Котики, сердечки, логотип — любая картинка станет лампочкой. Лучше PNG с прозрачным фоном.'),
     thumbs,file,el('div',{className:'btns'},el('button',{className:'wide',textContent:'+ Загрузить картинки или гифки',on:{click:()=>file.click()}})),
     (()=>{const u=el('input',{placeholder:'или вставь ссылку на картинку/гифку',style:'width:100%;background:#15121b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;margin-bottom:6px'});
-      return el('div',{className:'row'},u,el('button',{className:'wide',textContent:'Добавить по ссылке',on:{click:()=>{const v=u.value.trim();if(!/^https?:\/\//.test(v)){toast('Нужна ссылка, начинающаяся с https://');return}cfg.images.push(v);u.value='';loadImages();drawThumbs();changed(true)}}}))})(),
+      return el('div',{className:'row'},u,el('button',{className:'wide',textContent:'Добавить по ссылке',on:{click:()=>{const v=u.value.trim();if(!/^https?:\/\//.test(v)){toast('Нужна ссылка, начинающаяся с https://');return}cfg.images.push(v);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once';u.value='';loadImages();drawThumbs();changed(true)}}}))})(),
     el('p',{className:'note'},'Гифки двигаются. Загруженная гифка сильно удлиняет ссылку для OBS, поэтому для гифок лучше «Скачать файл для OBS» или добавлять гифку по ссылке.'),
-    slider('Картинка вместо каждой N-й лампочки','imgEvery',1,6,1,v=>v===1?'все':'каждая '+v+'-я',true),
+    slider('N для «каждая N-я»','imgEvery',2,8,1,v=>'каждая '+Math.max(2,v)+'-я',true),
+    slider('Где висят «одна штука»','imgPos',0,0.99,0.01,v=>v<0.2?'слева':v>0.8?'справа':v>0.4&&v<0.6?'посередине':Math.round(v*100)+'%',true),
     slider('Размер картинок','imgSize',1,10,0.1,v=>v.toFixed(1)+'×',true),
     check('Подсветка вокруг картинок','imgGlow')
   ));
