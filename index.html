@@ -936,10 +936,18 @@ function heatConnect(){
   let ws;try{ws=new WebSocket(green?'wss://heat.prod.kr/'+encodeURIComponent(cfg.heatLogin):'wss://heat-api.j38.net/channel/'+encodeURIComponent(cfg.heatId))}catch(e){heatState='error';heatStatus();return}
   heatWs=ws;
   ws.onopen=()=>{heatState='on';heatRetry=0;heatStatus()};
-  ws.onmessage=e=>{try{const m=JSON.parse(e.data);const x=parseFloat(m.x)*VW,y=parseFloat(m.y)*VH,id=String(m.id||'anon');if(m.type==='release'){releaseDrag(id);return}if(!isFinite(x)||!isFinite(y))return;if(m.type==='click'){if(!drags.has(id))tugAt(x,y)}else if(m.type==='drag')dragAt(id,x,y)}catch(err){}};
+  ws.onmessage=e=>{try{const m=JSON.parse(e.data);dbgEv(m);const x=parseFloat(m.x)*VW,y=parseFloat(m.y)*VH,id=String(m.id||'anon');if(m.type==='release'){releaseDrag(id);return}if(!isFinite(x)||!isFinite(y))return;if(m.type==='click'){if(!drags.has(id))tugAt(x,y)}else if(m.type==='drag')dragAt(id,x,y)}catch(err){}};
   ws.onclose=()=>{heatState='error';heatStatus();heatWs=null;clearTimeout(heatConnect.t);heatConnect.t=setTimeout(heatConnect,Math.min(30000,2000*(++heatRetry)))};
 }
-function heatStatus(){const el=document.getElementById('heatst');if(!el)return;el.textContent={off:'Не подключено',connecting:'Подключаюсь…',on:'✓ Подключено — клики зрителей будут приходить',error:'Нет связи с Heat, пробую ещё раз…'}[heatState]}
+const DBG=qs.get('debug')==='1';let dbgEl=null,dbgN=0,dbgLast='—';
+function dbgEv(m){dbgN++;dbgLast=(m.type||'?')+' '+new Date().toLocaleTimeString();dbgShow()}
+function dbgShow(){
+  if(!DBG)return;
+  if(!dbgEl){dbgEl=document.createElement('div');dbgEl.style.cssText='position:fixed;left:8px;bottom:8px;font:13px monospace;color:#fff;background:rgba(0,0,0,.6);padding:6px 9px;border-radius:6px;z-index:99;white-space:pre';document.body.appendChild(dbgEl)}
+  const green=cfg.heatProvider==='green';
+  dbgEl.textContent=`расширение: ${green?'GreenHeat':'Heat'}\nканал: ${green?(cfg.heatLogin||'не указан'):(cfg.heatLogin||'')+' (id '+(cfg.heatId||'нет')+')'}\nсвязь: ${{off:'не настроено',connecting:'подключаюсь',on:'подключено',error:'нет связи'}[heatState]}\nсобытий пришло: ${dbgN}, последнее: ${dbgLast}`;
+}
+function heatStatus(){dbgShow();const el=document.getElementById('heatst');if(!el)return;el.textContent={off:'Не подключено',connecting:'Подключаюсь…',on:'✓ Подключено — клики зрителей будут приходить',error:'Нет связи с Heat, пробую ещё раз…'}[heatState]}
 
 /* ---------- start ---------- */
 loadImages();
