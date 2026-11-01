@@ -86,7 +86,7 @@ const DEFAULT = {
   mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false, czEdison:true, czCat:true, czGhost:true, czDot:true, czBead:true, czLeaf:true, czEvery:10,
   wireColor:'#1a2a1e', wire:2.5,
   images:[], imgModes:[], imgPins:{}, imgCount:1, imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
-  snow:140, flake:1, stick:true, fall:'snow', fallAlpha:1, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
+  snow:140, flake:1, stick:true, fall:'snow', snowLook:'soft', leafLook:'mix', petalLook:'pinkred', fallAlpha:1, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
   wind:0.3, gust:0.5, heatLogin:'', heatId:'', heatProvider:'heat', tugPower:1, clickRings:true,
 };
 
@@ -305,6 +305,18 @@ const leafSprites=[].concat(
     for(let i=-2;i<=2;i++){const y=i*S*0.1;g.beginPath();g.moveTo(0,y);g.lineTo(S*0.16,y-S*0.09);g.moveTo(0,y);g.lineTo(-S*0.16,y-S*0.09);g.stroke()}
   },64));
 function spiderDepthAt(x){const u=Math.min(1,Math.abs(x/VW-0.5)*2);let w=Math.max(0,Math.min(1,(u-0.45)/0.4));w=w*w*(3-2*w);const mid=cfg.spiderMid!=null?cfg.spiderMid:cfg.spiderDepth;return mid+(cfg.spiderDepth-mid)*w}
+const snowSprites=[0,1,2].map(v=>{const S=64,c=document.createElement('canvas');c.width=c.height=S;const g=c.getContext('2d');g.translate(S/2,S/2);g.strokeStyle='#fff';g.lineCap='round';
+  for(let a=0;a<6;a++){g.save();g.rotate(a*Math.PI/3);g.lineWidth=S*0.05;g.beginPath();g.moveTo(0,0);g.lineTo(0,-S*0.44);g.stroke();g.lineWidth=S*0.04;
+    const br=[[0.18,0.12],[0.3,0.1],[0.38,0.06]].slice(0,v+1);for(const [d,l] of br){g.beginPath();g.moveTo(0,-S*d);g.lineTo(-S*l,-S*(d+l*0.9));g.moveTo(0,-S*d);g.lineTo(S*l,-S*(d+l*0.9));g.stroke()}g.restore()}
+  g.fillStyle='#fff';g.beginPath();g.arc(0,0,S*0.05,0,6.283);g.fill();return c});
+const COZY_LEAF=['#e07a28','#f09a3a','#c8601e','#e8892f','#d4682a'];
+const cozyLeafSprites=makeSprites(COZY_LEAF,(g,c,S)=>{g.translate(S/2,S/2);g.rotate(0.4);g.fillStyle=c;g.beginPath();g.moveTo(0,-S*0.42);g.bezierCurveTo(S*0.34,-S*0.2,S*0.24,S*0.25,0,S*0.42);g.bezierCurveTo(-S*0.24,S*0.25,-S*0.34,-S*0.2,0,-S*0.42);g.fill();g.strokeStyle='rgba(120,60,20,.45)';g.lineWidth=S*0.03;g.beginPath();g.moveTo(0,-S*0.36);g.lineTo(0,S*0.46);g.stroke()},48);
+const birchSprites=makeSprites(['#f2c230','#e8b020','#f5d55a','#d9a21a','#c9b23a'],(g,c,S)=>{const k=hex2rgb(c);g.translate(S/2,S/2);g.rotate(-0.3);g.beginPath();g.moveTo(0,-S*0.36);g.quadraticCurveTo(S*0.3,-S*0.1,0,S*0.3);g.quadraticCurveTo(-S*0.3,-S*0.1,0,-S*0.36);const gr=g.createLinearGradient(-S*0.3,0,S*0.3,0);gr.addColorStop(0,rgb(mix(k,BLACK,0.15)));gr.addColorStop(1,rgb(mix(k,WHITE,0.25)));g.fillStyle=gr;g.fill();g.strokeStyle=rgb(mix(k,BLACK,0.35),0.6);g.lineWidth=S*0.025;g.beginPath();g.moveTo(0,-S*0.3);g.lineTo(0,S*0.42);g.stroke()},40);
+function petalShape(g,S,notch){g.beginPath();g.moveTo(S/2,S*0.92);g.bezierCurveTo(S*0.05,S*0.62,S*0.12,S*0.12,S*0.42,S*0.08);if(notch){g.lineTo(S/2,S*0.2)}else g.quadraticCurveTo(S/2,S*0.18,S*0.58,S*0.08);g.lineTo(S*0.58,S*0.08);g.bezierCurveTo(S*0.88,S*0.12,S*0.95,S*0.62,S/2,S*0.92)}
+const sakuraSprites=makeSprites(['#ffd1e0','#ffc0d6','#ffe3ec','#ffb3cc'],(g,c,S)=>{const k=hex2rgb(c);const gr=g.createLinearGradient(0,S*0.9,0,S*0.1);gr.addColorStop(0,rgb(mix(k,[255,120,170],0.35)));gr.addColorStop(1,rgb(mix(k,WHITE,0.4)));g.fillStyle=gr;petalShape(g,S,true);g.fill()},48);
+const roseSprites=makeSprites(['#b3001b','#d0102c','#8e0016','#e0213d'],(g,c,S)=>{const k=hex2rgb(c);const gr=g.createRadialGradient(S*0.45,S*0.4,0,S/2,S/2,S*0.5);gr.addColorStop(0,rgb(mix(k,WHITE,0.15)));gr.addColorStop(0.8,rgb(k));gr.addColorStop(1,rgb(mix(k,BLACK,0.35)));g.fillStyle=gr;g.beginPath();g.moveTo(S*0.5,S*0.9);g.bezierCurveTo(S*0.02,S*0.75,S*0.05,S*0.15,S*0.5,S*0.1);g.bezierCurveTo(S*0.95,S*0.15,S*0.98,S*0.75,S*0.5,S*0.9);g.fill()},48);
+const whitePetalSprites=makeSprites(['#ffffff','#fff6f0','#f6f0ff'],(g,c,S)=>{const k=hex2rgb(c);const gr=g.createLinearGradient(0,S*0.9,0,S*0.1);gr.addColorStop(0,rgb(mix(k,[220,210,230],0.4)));gr.addColorStop(1,rgb(k));g.fillStyle=gr;petalShape(g,S,false);g.fill()},48);
+function pick(a){return a[Math.random()*a.length|0]}
 function fallFade(f){
   if(f.kind==='spiders')return 1;
   let a=f.tmp?1:cfg.fallAlpha;
@@ -354,8 +366,13 @@ function newFlake(x,y,tmp,kind){
   kind=kind||cfg.fall;
   const r=(0.8+Math.random()*2.2)*cfg.flake;
   const f={kind,x,y,r,ph:Math.random()*6.283,vy:0.5+r*0.32+Math.random()*0.4,tmp,rot:Math.random()*6.283,vr:(Math.random()-0.5)*0.06,fl:Math.random()*6.283,vf:0.02+Math.random()*0.05};
-  if(kind==='petals'){f.vy=0.5+Math.random()*0.7;f.spr=petalSprites[Math.random()*petalSprites.length|0];f.w=(10+r*5)}
-  if(kind==='leaves'){f.vy=0.7+Math.random()*0.8;f.spr=leafSprites[Math.random()*leafSprites.length|0];f.w=(26+r*9);f.vr*=1.5}
+  if(kind==='snow'&&!tmp&&(cfg.snowLook==='flakes'||(cfg.snowLook==='mixed'&&Math.random()<0.4))){f.spr=pick(snowSprites);f.w=8+r*5;f.cr=true;f.vr=(Math.random()-0.5)*0.03}
+  if(kind==='petals'){const L=cfg.petalLook;f.vy=0.5+Math.random()*0.7;f.spr=pick(L==='sakura'?sakuraSprites:L==='roses'?roseSprites:L==='white'?whitePetalSprites:petalSprites);f.w=(L==='roses'?14:10)+r*5}
+  if(kind==='leaves'){const L=cfg.leafLook;f.vy=0.7+Math.random()*0.8;f.vr*=1.5;
+    if(L==='maple'){f.spr=pick(leafSprites.slice(0,LEAF_COLORS.length));f.w=26+r*9}
+    else if(L==='cozy'){f.spr=pick(cozyLeafSprites);f.w=16+r*6}
+    else if(L==='birch'){f.spr=pick(birchSprites);f.w=11+r*4;f.vy*=0.8}
+    else{f.spr=pick(leafSprites);f.w=26+r*9}}
   if(kind==='spiders'){f.x=40+Math.random()*(VW-80);f.y=-20-Math.random()*500;f.st=0;f.target=40+Math.random()*VH*spiderDepthAt(f.x);f.hold=3+Math.random()*7;f.s=(44+Math.random()*26)*cfg.flake;f.down=0.8+Math.random()*0.8}
   return f;
 }
@@ -376,7 +393,7 @@ function updateFlakes(t){
       out.push(f);continue;
     }
     const sp=f.tmp?1:cfg.fallSpeed;
-    if(f.kind==='snow'){f.y+=f.vy*sp;f.x+=(windAt(t,f.x)*30*(0.6+f.r*0.2)+Math.sin(t*1.4+f.ph)*0.35)*Math.sqrt(sp)}
+    if(f.kind==='snow'){if(f.cr)f.rot+=f.vr;f.y+=f.vy*sp;f.x+=(windAt(t,f.x)*30*(0.6+f.r*0.2)+Math.sin(t*1.4+f.ph)*0.35)*Math.sqrt(sp)}
     else{
       const k=f.kind==='leaves'?1.3:1;
       f.y+=f.vy*sp*(0.75+0.35*Math.sin(t*1.1+f.ph));f.x+=(windAt(t,f.x)*38*k+Math.sin(t*0.9+f.ph)*0.9*k)*Math.sqrt(sp);
@@ -694,6 +711,7 @@ function render(){
   // flakes
   for(const f of flakes){
     const fa=fallFade(f);if(fa<=0.01)continue;
+    if(f.kind==='snow'&&f.cr){ctx.globalAlpha=0.85*fa;ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.rot);ctx.drawImage(f.spr,-f.w/2,-f.w/2,f.w,f.w);ctx.restore();continue}
     if(f.kind==='snow'){ctx.globalAlpha=(0.45+0.5*Math.min(1,f.r/3))*fa;const R=f.r*1.7;ctx.drawImage(flakeSprite,f.x-R,f.y-R,R*2,R*2);continue}
     ctx.globalAlpha=1;ctx.save();
     if(f.kind==='spiders'){ctx.restore();drawSpiderParticle(f,t);continue}
@@ -797,7 +815,7 @@ function slider(label,key,min,max,stp,fmt,rb){
 }
 function check(label,key,rb){return el('label',{className:'chk'},el('input',{type:'checkbox',checked:!!cfg[key],on:{change:e=>{cfg[key]=e.target.checked;if(key==='edgeSpiders')syncEdge();changed(rb)}}}),label)}
 function selectRow(label,key,opts,rb){
-  const s=el('select',{on:{change:e=>{cfg[key]=e.target.value;if(key==='heatProvider'){setTimeout(()=>document.querySelector('#heatconnect')?.click(),0)}if(key==='fall'){flakes=[];syncFlakes();for(const ch of chains)for(const q of ch.P)q.snow=0}changed(rb)}}});
+  const s=el('select',{on:{change:e=>{cfg[key]=e.target.value;if(key==='heatProvider'){setTimeout(()=>document.querySelector('#heatconnect')?.click(),0)}if(key==='snowLook'||key==='leafLook'||key==='petalLook'){flakes=[];syncFlakes()}if(key==='fall'){const sc=document.getElementById('panel').scrollTop;setTimeout(()=>{buildPanel();document.getElementById('panel').scrollTop=sc},0);flakes=[];syncFlakes();for(const ch of chains)for(const q of ch.P)q.snow=0}changed(rb)}}});
   for(const [v,l] of opts)s.append(el('option',{value:v,selected:cfg[key]===v},l));
   return el('div',{className:'row'},el('label',null,el('span',null,label)),s);
 }
@@ -901,20 +919,33 @@ function buildPanel(){
     check('Подсветка вокруг картинок','imgGlow')
   ));
 
-  pn.append(sec('Погода',
-    selectRow('Что падает','fall',[['snow','Снег'],['spiders','Спускаются паучки'],['petals','Розовые и красные лепестки'],['leaves','Осенние листья']]),
-    check('Паучки по краям экрана (вдобавок к тому, что падает)','edgeSpiders'),
-    slider('Паучков с каждой стороны','edgeSpiderCount',1,4,1,v=>v),
-    selectRow('Вид паучков','spiderLook',[['classic','Чёрные, с красными глазками'],['cute','Милые, как в уютной гирлянде']]),
-    slider('Паучки по краям спускаются','spiderDepth',0.05,0.9,0.05,v=>'до '+Math.round(v*100)+'% экрана'),
-    slider('Паучки в середине спускаются','spiderMid',0.03,0.9,0.01,v=>'до '+Math.round(v*100)+'% экрана'),
+  const fl=cfg.fall;
+  const looks={snow:['snowLook',[['soft','Мягкие точки'],['flakes','Снежинки-звёздочки'],['mixed','Вперемешку']]],
+    leaves:['leafLook',[['mix','Кленовые и простые, разноцветные'],['maple','Только кленовые'],['cozy','Плоские, как на уютной гирлянде'],['birch','Мелкие жёлтые берёзовые']]],
+    petals:['petalLook',[['pinkred','Розовые и красные'],['sakura','Сакура'],['roses','Лепестки роз'],['white','Белые']]],
+    spiders:['spiderLook',[['classic','Чёрные, с красными глазками'],['cute','Милые, как в уютной гирлянде']]]};
+  const lk=looks[fl];
+  pn.append(sec('Что падает',
+    selectRow('Что падает','fall',[['snow','Снег'],['leaves','Листья'],['petals','Лепестки'],['spiders','Спускаются паучки']]),
+    lk?selectRow('Вид',lk[0],lk[1]):null,
     slider('Сколько','snow',0,500,10,v=>v?v:'выкл'),
     slider('Размер','flake',0.4,2.5,0.1,v=>v.toFixed(1)+'×'),
-    slider('Прозрачность','fallAlpha',0.1,1,0.05,v=>Math.round(v*100)+'%'),
-    slider('Скорость падения','fallSpeed',0.2,2.5,0.05,v=>v.toFixed(2)+'×'),
-    slider('Докуда долетает','fallDepth',0.1,1,0.05,v=>v>=1?'до низа':'тает на '+Math.round(v*100)+'% экрана'),
-    slider('Пустая зона в центре','fallClear',0,0.9,0.05,v=>v?Math.round(v*100)+'% ширины':'нет'),
-    check('Снег налипает на провод (только для снега)','stick'),
+    fl==='spiders'?slider('По краям спускаются','spiderDepth',0.05,0.9,0.05,v=>'до '+Math.round(v*100)+'% экрана'):null,
+    fl==='spiders'?slider('В середине спускаются','spiderMid',0.03,0.9,0.01,v=>'до '+Math.round(v*100)+'% экрана'):null,
+    fl!=='spiders'?slider('Прозрачность','fallAlpha',0.1,1,0.05,v=>Math.round(v*100)+'%'):null,
+    fl!=='spiders'?slider('Скорость падения','fallSpeed',0.2,2.5,0.05,v=>v.toFixed(2)+'×'):null,
+    fl!=='spiders'?slider('Докуда долетает','fallDepth',0.1,1,0.05,v=>v>=1?'до низа':'тает на '+Math.round(v*100)+'% экрана'):null,
+    fl!=='spiders'?slider('Пустая зона в центре','fallClear',0,0.9,0.05,v=>v?Math.round(v*100)+'% ширины':'нет'):null,
+    fl==='snow'?check('Снег налипает на провод','stick'):null
+  ));
+  pn.append(sec('Паучки по краям экрана',
+    el('p',{className:'note'},'Висят у левого и правого края вдобавок к тому, что падает.'),
+    check('Включить','edgeSpiders'),
+    slider('Паучков с каждой стороны','edgeSpiderCount',1,4,1,v=>v),
+    selectRow('Вид паучков','spiderLook',[['classic','Чёрные, с красными глазками'],['cute','Милые, как в уютной гирлянде']]),
+    slider('Как низко спускаются','spiderDepth',0.05,0.9,0.05,v=>'до '+Math.round(v*100)+'% экрана')
+  ));
+  pn.append(sec('Ветер',
     slider('Ветер','wind',0,1.5,0.05,v=>Math.round(v*100)+'%'),
     slider('Порывы','gust',0,1.5,0.05,v=>Math.round(v*100)+'%')
   ));
