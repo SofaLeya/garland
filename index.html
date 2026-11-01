@@ -51,6 +51,33 @@ textarea{width:100%;height:70px;background:#0e0c12;color:var(--text);border:1px 
 #frame.bg-checker{background:repeating-conic-gradient(#2a2a2e 0 25%,#1f1f23 0 50%) 0 0/24px 24px}
 #frame.bg-light{background:linear-gradient(#dfe6ef,#c4cfdc)}
 #frame #cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.tabs{position:sticky;top:-18px;z-index:5;display:flex;gap:4px;background:var(--panel);padding:8px 0 10px;margin:0 0 6px;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;padding:7px 2px;font-size:12px;border-radius:8px}
+.tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 12px}
+.card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 4px;font-size:11.5px;line-height:1.2;text-align:center}
+.card .ic{display:block;width:100%}
+.card .ic svg{width:100%;height:auto;display:block}
+.card .ic.emo{font-size:22px;line-height:34px}
+.card.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;background:#2a2116;color:var(--text);font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;column-gap:8px}
+details.more{margin:0 0 12px}
+details.more summary{cursor:pointer;color:var(--muted);font-size:12px;margin:0 0 10px;list-style:none}
+details.more summary::before{content:'▸ ';}
+details.more[open] summary::before{content:'▾ ';}
+.imgcards{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}
+.imgcard{display:flex;gap:8px;background:#15121b;border:1px solid var(--line);border-radius:10px;padding:6px}
+.imgcard.on{border-color:var(--accent)}
+.imgcard .thumb{width:64px;height:64px;flex:none;border-radius:8px;background:repeating-conic-gradient(#2a2a2e 0 25%,#1f1f23 0 50%) 0 0/12px 12px;display:grid;place-items:center}
+.imgcard .thumb img{max-width:60px;max-height:60px}
+.imgctl{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.imgctl select{padding:4px 6px;font-size:12px}
+.mini-row{display:flex;align-items:center;gap:6px}
+.mini-row input[type=range]{flex:1}
+.mini{font-size:11px;color:var(--muted);white-space:nowrap}
+button.small{padding:3px 7px;font-size:11px}
+button.danger{color:var(--danger)}
+#tools .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--accent-ink);padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
 </style>
 </head>
@@ -870,7 +897,8 @@ const HINTS={dup:'Кликни по любой висящей лампочке, 
 function updHint(){const h=document.getElementById('hint');if(h)h.textContent=(tool==='dup'&&dupBrush)?'Кликай по лампочкам, куда повесить копию. Клик по копии убирает её. Esc — скопировать другую.':(tool==='points'&&building>=0)?'Ставь следующую точку. Клик в последнюю точку или Esc — закончить.':HINTS[tool];cv.style.cursor=tool==='hang'?'copy':tool==='pull'?'grab':tool==='erase'?'not-allowed':'crosshair'}
 function buildTools(){
   const T=document.getElementById('tools');T.innerHTML='';
-  [['draw','✎ Рисовать'],['points','• По точкам'],['pull','✋ Потянуть'],['erase','✕ Стереть'],['hang','🖼 Повесить картинку'],['dup','⧉ Дублировать']].forEach(([k,l])=>{
+  [['draw','✎ Рисовать'],['points','• По точкам'],['erase','✕ Стереть'],['|'],['hang','🖼 Повесить картинку'],['dup','⧉ Дублировать'],['|'],['pull','✋ Потянуть']].forEach(([k,l])=>{
+    if(k==='|'){T.appendChild(el('span',{className:'sep'}));return}
     const b=document.createElement('button');b.textContent=l;b.className=tool===k?'on':'';b.onclick=()=>{tool=k;building=-1;dupBrush=null;buildTools()};T.appendChild(b);
   });
   const u=document.createElement('button');u.textContent='↶ Отменить';u.onclick=()=>{cfg.shape.pop();building=-1;changed(true)};T.appendChild(u);
@@ -891,7 +919,7 @@ function slider(label,key,min,max,stp,fmt,rb){
 }
 function check(label,key,rb){return el('label',{className:'chk'},el('input',{type:'checkbox',checked:!!cfg[key],on:{change:e=>{cfg[key]=e.target.checked;if(key==='edgeSpiders')syncEdge();changed(rb)}}}),label)}
 function selectRow(label,key,opts,rb){
-  const s=el('select',{on:{change:e=>{cfg[key]=e.target.value;if(key==='heatProvider'){setTimeout(()=>document.querySelector('#heatconnect')?.click(),0)}if(key==='snowLook'||key==='leafLook'||key==='petalLook'){flakes=[];syncFlakes()}if(key==='fall'){const sc=document.getElementById('panel').scrollTop;setTimeout(()=>{buildPanel();document.getElementById('panel').scrollTop=sc},0);flakes=[];syncFlakes();for(const ch of chains)for(const q of ch.P)q.snow=0}changed(rb)}}});
+  const s=el('select',{on:{change:e=>{cfg[key]=e.target.value;if(key==='style'){setTimeout(rerender,0)}if(key==='heatProvider'){setTimeout(()=>document.querySelector('#heatconnect')?.click(),0)}if(key==='snowLook'||key==='leafLook'||key==='petalLook'){flakes=[];syncFlakes()}if(key==='fall'){const sc=document.getElementById('panel').scrollTop;setTimeout(()=>{buildPanel();document.getElementById('panel').scrollTop=sc},0);flakes=[];syncFlakes();for(const ch of chains)for(const q of ch.P)q.snow=0}changed(rb)}}});
   for(const [v,l] of opts)s.append(el('option',{value:v,selected:cfg[key]===v},l));
   return el('div',{className:'row'},el('label',null,el('span',null,label)),s);
 }
@@ -930,104 +958,152 @@ function download(){
 }
 function shrinkImage(file){return new Promise(res=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const M=128;const k=Math.min(1,M/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/png'))};im.onerror=()=>res(null);im.src=r.result};r.readAsDataURL(file)})}
 
+let panelTab=(()=>{try{return localStorage.getItem('garland-tab')||'shape'}catch(e){return 'shape'}})();
+function rerender(){const pn=document.getElementById('panel');const sc=pn.scrollTop;buildPanel();pn.scrollTop=sc}
+function more(title,...kids){const d=el('details',{className:'more'},el('summary',null,title),...kids);return d}
+function cards(items,isOn,onPick){return el('div',{className:'cards'},...items.map(([k,label,icon])=>el('button',{className:'card'+(isOn(k)?' on':''),on:{click:()=>onPick(k)}},typeof icon==='string'&&icon.startsWith('<svg')?(()=>{const s=el('span',{className:'ic'});s.innerHTML=icon;return s})():el('span',{className:'ic emo'},icon),el('span',null,label))))}
+const SH=(d,extra='')=>`<svg viewBox="0 0 60 34"><rect x="0" y="0" width="60" height="34" rx="4" fill="#0f0d14"/>${extra}<path d="${d}" fill="none" stroke="#ffb347" stroke-width="2" stroke-linecap="round"/></svg>`;
+const SWAG=y=>`M2 ${y} Q8 ${y+7} 14 ${y} Q20 ${y+7} 26 ${y} Q32 ${y+7} 38 ${y} Q44 ${y+7} 50 ${y} Q55 ${y+6} 58 ${y}`;
+const SHAPE_ICONS={
+  top:SH(SWAG(4)),
+  u:SH('M4 32 V5 '+'Q10 11 16 5 Q22 11 28 5 Q34 11 40 5 Q46 11 56 5 V32'),
+  frame:SH('M4 4 H56 V30 H4 Z'),
+  corner:SH('M2 22 Q6 22 8 15 Q11 7 17 5 Q22 2 30 2'),
+  bottom:SH(SWAG(25)),
+  layers:SH(SWAG(4),`<path d="${SWAG(7)}" fill="none" stroke="#c98a3a" stroke-width="1.6"/><path d="M2 5 Q12 16 22 5 Q32 16 42 5 Q50 14 58 5" fill="none" stroke="#a8743a" stroke-width="1.4"/>`)
+};
+const TABS=[['shape','Форма'],['hang','Подвески'],['weather','Погода'],['stream','Стрим'],['save','Сохранить']];
+const field=attrs=>el('input',Object.assign({style:'width:100%;background:#15121b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;margin-bottom:8px'},attrs));
+const WARN=()=>el('div',{className:'linkwarn',style:'display:none;background:#3a2410;border:1px solid #ffb347;color:#ffd9a0;border-radius:8px;padding:8px 10px;margin:0 0 12px;font-size:12px'},el('b',null,'⚠ Ссылка не подойдёт для OBS. '),'Картинки, загруженные с компьютера, делают её слишком длинной. Подключи в OBS ',el('b',null,'скачанный файл'),' или добавь картинки по ссылке.');
+
 function buildPanel(){
   const pn=document.getElementById('panel');pn.innerHTML='';
-  pn.append(el('h1',null,'Гирлянда'),el('p',{className:'sub'},'Виджет для OBS. Настрой тут, потом скачай файл.'));
+  pn.append(el('h1',null,'Гирлянда'),el('p',{className:'sub'},'Виджет для OBS'));
+  pn.append(el('div',{className:'tabs'},...TABS.map(([k,l])=>el('button',{className:panelTab===k?'on':'',textContent:l,on:{click:()=>{panelTab=k;try{localStorage.setItem('garland-tab',k)}catch(e){}pn.scrollTop=0;buildPanel()}}}))));
+  const T={shape:tabShape,hang:tabHang,weather:tabWeather,stream:tabStream,save:tabSave}[panelTab]||tabShape;
+  T(pn);
+  drawThumbsRef=rerender;heatStatus();setTimeout(linkWarn,0);
+}
 
-  pn.append(sec('Форма',
-    el('div',{className:'btns'},
-      el('button',{textContent:'По верху',on:{click:()=>setPreset('top')}}),
-      el('button',{textContent:'Верх + бока',on:{click:()=>setPreset('u')}}),
-      el('button',{textContent:'Рамка',on:{click:()=>setPreset('frame')}}),
-      el('button',{textContent:'Угол',on:{click:()=>setPreset('corner')}}),
-      el('button',{textContent:'Низ',on:{click:()=>setPreset('bottom')}}),
-      el('button',{textContent:'✦ Готовый стиль: уютная осень',on:{click:applyCozy}}),
-      el('button',{textContent:'Очистить',on:{click:()=>{cfg.shape=[];building=-1;changed(true)}}})),
-    (()=>{const n=cfg.shape.filter(s=>s.layer).length;const val=el('span',{id:'layersval'},String(n));
-      return el('div',{className:'row'},el('label',null,el('span',null,'Проводов по верху (слоями внахлёст)'),val),
-        el('div',{className:'btns'},el('button',{textContent:'− убрать провод',on:{click:()=>{const k=cfg.shape.filter(s=>s.layer).length;if(k>0)setLayers(k-1)}}}),el('button',{textContent:'+ добавить провод',on:{click:()=>{const k=cfg.shape.filter(s=>s.layer).length;if(k<7)setLayers(k+1)}}})))})(),
-    slider('Провис','sag',0,0.35,0.005,v=>Math.round(v*100)+'%',true),
-    slider('Расстояние между креплениями','spacing',120,800,10,v=>v+' px',true),
-    el('p',{className:'note'},'Форму можно нарисовать мышкой прямо на превью: инструменты над картинкой.')
+function tabShape(pn){
+  const layers=cfg.shape.filter(s=>s.layer).length;
+  pn.append(sec('Готовые формы',
+    cards([['top','По верху',SHAPE_ICONS.top],['u','Верх + бока',SHAPE_ICONS.u],['frame','Рамка',SHAPE_ICONS.frame],['corner','Угол',SHAPE_ICONS.corner],['bottom','Низ',SHAPE_ICONS.bottom],['layers','Слоями внахлёст',SHAPE_ICONS.layers]],
+      ()=>false,k=>{if(k==='layers'){cfg.shape=[];setLayers(3)}else setPreset(k);rerender()}),
+    el('p',{className:'note'},'Своя форма — инструменты над превью: «Рисовать» мышкой или «По точкам».')
   ));
+  pn.append(sec('Провода',
+    el('div',{className:'row'},el('label',null,el('span',null,'Проводов по верху'),el('span',{id:'layersval'},String(layers))),
+      el('div',{className:'btns'},el('button',{textContent:'− убрать',on:{click:()=>{const k=cfg.shape.filter(s=>s.layer).length;if(k>0)setLayers(k-1)}}}),el('button',{textContent:'+ добавить',on:{click:()=>{const k=cfg.shape.filter(s=>s.layer).length;if(k<7)setLayers(k+1)}}}))),
+    slider('Провис','sag',0,0.35,0.005,v=>Math.round(v*100)+'%',true),
+    slider('Ширина провисов','spacing',120,800,10,v=>v+' px',true),
+    el('div',{className:'btns'},el('button',{className:'wide',textContent:'Убрать все провода',on:{click:()=>{cfg.shape=[];building=-1;changed(true);rerender()}}}))
+  ));
+}
 
+function tabHang(pn){
+  const st=cfg.style,isHal=st==='halloween'||HALLOWEEN.includes(st),isCozy=st==='cozy';
+  pn.append(sec('Стиль',
+    cards([['classic','Классика','💡'],['halloween','Хэллоуин','🎃'],['cozy','Уютная','🐱']],
+      k=>k==='halloween'?isHal:st===k,k=>{cfg.style=k;changed(true);rerender()}),
+    isHal?selectRow('Какие фигурки','style',[['halloween','Все вперемешку'],['pumpkin','Тыквы'],['ghost','Привидения'],['bat','Летучие мыши'],['cat','Чёрные кошки'],['spider','Пауки']],true):null,
+    el('div',{className:'btns'},el('button',{className:'wide',textContent:'✦ Готовый набор «Уютная осень»',on:{click:applyCozy}}))
+  ));
+  if(isCozy)pn.append(sec('Что висит',
+    el('div',{className:'grid2'},check('Лампы Эдисона','czEdison',true),check('Котики-фонарики','czCat',true),check('Привидения','czGhost',true),check('Огоньки','czDot',true),check('Бусины','czBead',true),check('Листики','czLeaf',true)),
+    slider('Большие подвески','czEvery',3,40,1,v=>'каждая '+v+'-я',true)
+  ));
   const pal=el('div',{className:'pal'});
   const drawPal=()=>{pal.innerHTML='';cfg.palette.forEach((c,i)=>{pal.append(el('div',{className:'sw'},el('input',{type:'color',value:c,on:{input:e=>{cfg.palette[i]=e.target.value;changed(false)}}}),el('b',{textContent:'×',on:{click:()=>{if(cfg.palette.length>1){cfg.palette.splice(i,1);drawPal();changed(false)}}}})))});pal.append(el('button',{textContent:'+',on:{click:()=>{cfg.palette.push('#ffffff');drawPal();changed(false)}}}))};drawPal();
   const palSel=el('select',{on:{change:e=>{if(PALETTES[e.target.value]){cfg.palette=PALETTES[e.target.value].slice();drawPal();changed(false)}}}},el('option',{value:''},'Готовые цвета…'),...Object.keys(PALETTES).map(k=>el('option',{value:k},k)));
-  const wcol=el('input',{type:'color',value:cfg.wireColor,on:{input:e=>{cfg.wireColor=e.target.value;changed(false)}}});
-  pn.append(sec('Лампочки',
+  pn.append(sec('Цвет и мерцание',
+    isCozy?el('p',{className:'note'},'Цвета красят маленькие огоньки.'):isHal?el('p',{className:'note'},'Цвета красят свечение вокруг мышей и пауков.'):null,
     el('div',{className:'row'},palSel),pal,
-    selectRow('Вид','style',[['classic','Классические лампочки'],['halloween','Хэллоуин: все вперемешку'],['pumpkin','Тыквы'],['ghost','Привидения'],['bat','Летучие мыши'],['cat','Чёрные кошки'],['spider','Пауки'],['cozy','Уютная: огоньки, бусины, листья, котики-фонарики']],true),
-    check('Зелёная лоза на проводе','vine'),
-    el('p',{className:'note',style:'margin:4px 0 6px'},el('b',null,'Для уютного вида — что висит:')),
-    el('div',{style:'display:grid;grid-template-columns:1fr 1fr;column-gap:8px'},check('Лампы Эдисона','czEdison',true),check('Котики-фонарики','czCat',true),check('Привидения','czGhost',true),check('Огоньки','czDot',true),check('Бусины','czBead',true),check('Листики','czLeaf',true)),
-    slider('Большие подвески: каждая N-я','czEvery',3,40,1,v=>'каждая '+v+'-я',true),
-    el('p',{className:'note'},'Заменить большие подвески на своё: загрузи картинку в «Свои картинки» и выбери под ней «вместо больших подвесок».'),
-    slider('Размер фигурок (Хэллоуин)','figSize',1,4,0.1,v=>v.toFixed(1)+'×',true),
-    slider('Паутинка у пауков на гирлянде','spiderThread',0.2,2,0.1,v=>v.toFixed(1)+'×',true),
-    selectRow('Режим','mode',[['twinkle','Мерцание'],['steady','Горят ровно'],['chase','Бегущие огни'],['wave','Волна'],['flash','Случайные вспышки'],['cycle','Перелив цветов']]),
+    selectRow('Как мерцают','mode',[['twinkle','Мерцание'],['steady','Горят ровно'],['chase','Бегущие огни'],['wave','Волна'],['flash','Случайные вспышки'],['cycle','Перелив цветов']]),
     slider('Скорость','speed',0.1,3,0.05,v=>v.toFixed(2)+'×'),
-    slider('Свечение','glow',0,2,0.05,v=>Math.round(v*100)+'%'),
-    slider('Размер лампочек','bulbSize',6,40,1,v=>v,true),
-    slider('Шаг между лампочками','bulbGap',14,120,1,v=>v+' px',true),
-    el('div',{className:'row'},el('label',null,el('span',null,'Цвет провода'),wcol)),
-    slider('Толщина провода','wire',1,8,0.5,v=>v)
+    slider('Свечение','glow',0,2,0.05,v=>Math.round(v*100)+'%')
   ));
-
-  const thumbs=el('div',{className:'thumbs'});
-  const drawThumbs=()=>{thumbs.innerHTML='';cfg.images.forEach((src,i)=>{
-    const sel=el('select',{style:'width:96px;padding:3px;font-size:11px;margin-top:4px',on:{change:e=>{cfg.imgModes=cfg.imgModes||[];cfg.imgModes[i]=e.target.value;changed(true)}}});
-    for(const [v,l] of [['manual','где кликну'],['once','N штук'],['every','каждая N-я'],['pend','вместо больших подвесок'],['all','вместо всех']])sel.append(el('option',{value:v,selected:imgMode(i)===v},l));
-    thumbs.append(el('div',{style:'display:flex;flex-direction:column;align-items:center'},el('div',{className:'th',title:'Клик — выбрать для инструмента «Повесить картинку»',style:'width:96px;height:64px;cursor:pointer;'+(selImg===i?'outline:2px solid var(--accent);outline-offset:1px':''),on:{click:e=>{if(e.target.tagName==='B')return;selImg=i;drawThumbs()}}},el('img',{src,style:'max-width:88px;max-height:56px'}),el('b',{textContent:'×',on:{click:()=>{cfg.images.splice(i,1);if(cfg.imgModes)cfg.imgModes.splice(i,1);if(cfg.imgSizes)cfg.imgSizes.splice(i,1);const np={};for(const k in (cfg.imgPins||{})){const v=cfg.imgPins[k];if(v<i)np[k]=v;else if(v>i)np[k]=v-1}cfg.imgPins=np;if(selImg>=cfg.images.length)selImg=Math.max(0,cfg.images.length-1);loadImages();drawThumbs();changed(true)}}})),sel,(()=>{const cur=(cfg.imgSizes&&cfg.imgSizes[i])||1;const lab=el('span',{style:'font-size:11px;color:var(--muted)'},'размер '+cur.toFixed(1)+'×');const r=el('input',{type:'range',min:0.2,max:3,step:0.1,value:cur,style:'width:96px',on:{input:e=>{cfg.imgSizes=cfg.imgSizes||[];cfg.imgSizes[i]=+e.target.value;lab.textContent='размер '+cfg.imgSizes[i].toFixed(1)+'×';changed(true)}}});return el('div',{style:'display:flex;flex-direction:column;align-items:center;margin-top:4px'},lab,r)})()));
-  })};drawThumbsRef=drawThumbs;drawThumbs();
-  const file=el('input',{type:'file',accept:'image/*',multiple:true,style:'display:none',on:{change:async e=>{for(const f of e.target.files){const d=(f.type==='image/gif'&&f.size<1500000)?await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)}):await shrinkImage(f);if(d){cfg.images.push(d);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once';selImg=cfg.images.length-1}}e.target.value='';loadImages();drawThumbs();changed(true)}}});
-  pn.append(sec('Свои картинки',
-    el('p',{className:'note'},'Котики, сердечки, логотип — любая картинка станет лампочкой. Лучше PNG с прозрачным фоном.'),
-    thumbs,file,el('div',{className:'btns'},el('button',{className:'wide',textContent:'+ Загрузить картинки или гифки',on:{click:()=>file.click()}})),
-    (()=>{const u=el('input',{placeholder:'или вставь ссылку на картинку/гифку',style:'width:100%;background:#15121b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;margin-bottom:6px'});
-      return el('div',{className:'row'},u,el('button',{className:'wide',textContent:'Добавить по ссылке',on:{click:()=>{const v=u.value.trim();if(!/^https?:\/\//.test(v)){toast('Нужна ссылка, начинающаяся с https://');return}cfg.images.push(v);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once';u.value='';loadImages();drawThumbs();changed(true)}}}))})(),
-    el('div',{className:'linkwarn',style:'display:none;background:#3a2410;border:1px solid #ffb347;color:#ffd9a0;border-radius:8px;padding:8px 10px;margin:0 0 12px;font-size:12px'},el('b',null,'⚠ Ссылка не подойдёт для OBS. '),'Загруженные с компьютера гифки или картинки делают её слишком длинной, и OBS её обрежет: гирлянда покажется со стандартными настройками. Подключи в OBS ',el('b',null,'скачанный файл'),' или замени загруженные гифки на добавленные по ссылке.'),
-    el('p',{className:'note'},'Гифки двигаются. Загруженная гифка сильно удлиняет ссылку для OBS, поэтому для гифок лучше «Скачать файл для OBS» или добавлять гифку по ссылке.'),
-    el('p',{className:'note'},el('b',null,'Заменить конкретные лампочки: '),'выбери картинку (клик по миниатюре), включи инструмент «🖼 Повесить картинку» над превью и кликай по лампочкам.'),
-    slider('Сколько штук (для «N штук»)','imgCount',1,12,1,v=>v,true),
-    slider('N для «каждая N-я»','imgEvery',2,40,1,v=>'каждая '+Math.max(2,v)+'-я',true),
-    slider('Откуда начинаются «N штук»','imgPos',0,0.99,0.01,v=>v<0.2?'слева':v>0.8?'справа':v>0.4&&v<0.6?'посередине':Math.round(v*100)+'%',true),
-    slider('Размер всех картинок','imgSize',1,10,0.1,v=>v.toFixed(1)+'×',true),
-    check('Подсветка вокруг картинок','imgGlow')
+  pn.append(sec('Размер и густота',
+    st==='classic'?slider('Размер лампочек','bulbSize',6,40,1,v=>v,true):slider('Размер фигурок','figSize',1,4,0.1,v=>v.toFixed(1)+'×',true),
+    slider('Как часто висят','bulbGap',14,120,1,v=>'через '+v+' px',true),
+    (st==='halloween'||st==='spider')?slider('Паутинка у пауков','spiderThread',0.2,2,0.1,v=>v.toFixed(1)+'×',true):null,
+    st!=='classic'?more('Ещё настройки',slider('Базовый размер всего','bulbSize',6,40,1,v=>v,true)):null
   ));
+  const wcol=el('input',{type:'color',value:cfg.wireColor,on:{input:e=>{cfg.wireColor=e.target.value;changed(false)}}});
+  pn.append(sec('Провод',
+    el('div',{className:'row'},el('label',null,el('span',null,'Цвет'),wcol)),
+    slider('Толщина','wire',1,8,0.5,v=>v),
+    check('Зелёная лоза','vine')
+  ));
+  pn.append(secImages());
+}
 
+function secImages(){
+  const modes=[['manual','где кликну'],['once','N штук'],['every','каждая N-я'],['pend','вместо больших подвесок'],['all','вместо всех']].filter(([v])=>v!=='pend'||cfg.style==='cozy');
+  const list=el('div',{className:'imgcards'});
+  cfg.images.forEach((src,i)=>{
+    const sel=el('select',{on:{change:e=>{cfg.imgModes=cfg.imgModes||[];cfg.imgModes[i]=e.target.value;changed(true);rerender()}}});
+    for(const [v,l] of modes)sel.append(el('option',{value:v,selected:imgMode(i)===v},l));
+    const cur=(cfg.imgSizes&&cfg.imgSizes[i])||1;const lab=el('span',{className:'mini'},'размер '+cur.toFixed(1)+'×');
+    const r=el('input',{type:'range',min:0.2,max:3,step:0.1,value:cur,on:{input:e=>{cfg.imgSizes=cfg.imgSizes||[];cfg.imgSizes[i]=+e.target.value;lab.textContent='размер '+cfg.imgSizes[i].toFixed(1)+'×';changed(true)}}});
+    const del=()=>{cfg.images.splice(i,1);if(cfg.imgModes)cfg.imgModes.splice(i,1);if(cfg.imgSizes)cfg.imgSizes.splice(i,1);const np={};for(const k in (cfg.imgPins||{})){const v=cfg.imgPins[k];if(typeof v==='string')np[k]=v;else if(v<i)np[k]=v;else if(v>i)np[k]=v-1}cfg.imgPins=np;if(selImg>=cfg.images.length)selImg=Math.max(0,cfg.images.length-1);loadImages();changed(true);rerender()};
+    list.append(el('div',{className:'imgcard'+(selImg===i&&tool==='hang'?' on':'')},
+      el('div',{className:'thumb'},el('img',{src})),
+      el('div',{className:'imgctl'},sel,el('div',{className:'mini-row'},lab,r),
+        el('div',{className:'mini-row'},el('button',{className:'small',textContent:'🖼 повесить кликом',on:{click:()=>{selImg=i;tool='hang';buildTools();rerender();toast('Кликай по лампочкам на превью')}}}),el('button',{className:'small danger',textContent:'удалить',on:{click:del}})))));
+  });
+  const file=el('input',{type:'file',accept:'image/*',multiple:true,style:'display:none',on:{change:async e=>{for(const f of e.target.files){const d=(f.type==='image/gif'&&f.size<1500000)?await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)}):await shrinkImage(f);if(d){cfg.images.push(d);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once';selImg=cfg.images.length-1}}e.target.value='';loadImages();changed(true);rerender()}}});
+  const u=field({placeholder:'или ссылка на картинку/гифку (https://…)'});
+  const used=m=>cfg.images.some((_,i)=>imgMode(i)===m);
+  return sec('Свои картинки и гифки',
+    list,
+    el('div',{className:'btns'},el('button',{className:'wide',textContent:'+ Загрузить с компьютера',on:{click:()=>file.click()}})),file,
+    u,el('div',{className:'btns'},el('button',{className:'wide',textContent:'Добавить по ссылке',on:{click:()=>{const v=u.value.trim();if(!/^https?:\/\//.test(v)){toast('Нужна ссылка, начинающаяся с https://');return}cfg.images.push(v);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once';selImg=cfg.images.length-1;loadImages();changed(true);rerender()}}})),
+    WARN(),
+    used('once')?slider('Сколько штук','imgCount',1,12,1,v=>v,true):null,
+    used('once')?slider('Где висят','imgPos',0,0.99,0.01,v=>v<0.2?'с левого края':v>0.8?'с правого края':v>0.4&&v<0.6?'с середины':Math.round(v*100)+'%',true):null,
+    used('every')?slider('Как часто','imgEvery',2,40,1,v=>'каждая '+Math.max(2,v)+'-я',true):null,
+    cfg.images.length?slider('Размер всех картинок','imgSize',1,10,0.1,v=>v.toFixed(1)+'×',true):null,
+    cfg.images.length?check('Подсветка вокруг','imgGlow'):null,
+    el('p',{className:'note'},'Хочешь ещё одну такую же подвеску (свою или встроенную)? Инструмент «⧉ Дублировать» над превью: кликни по подвеске, потом — куда повесить копию.')
+  );
+}
+
+function tabWeather(pn){
   const fl=cfg.fall;
   const looks={snow:['snowLook',[['soft','Мягкие точки'],['flakes','Снежинки-звёздочки'],['mixed','Вперемешку']]],
-    leaves:['leafLook',[['mix','Кленовые и простые, разноцветные'],['maple','Только кленовые'],['cozy','Плоские, как на уютной гирлянде'],['birch','Мелкие жёлтые берёзовые']]],
+    leaves:['leafLook',[['mix','Кленовые и простые'],['maple','Только кленовые'],['cozy','Плоские, как на уютной гирлянде'],['birch','Мелкие берёзовые']]],
     petals:['petalLook',[['pinkred','Розовые и красные'],['sakura','Сакура'],['roses','Лепестки роз'],['white','Белые']]],
-    spiders:['spiderLook',[['classic','Чёрные, с красными глазками'],['cute','Милые, как в уютной гирлянде']]]};
+    spiders:['spiderLook',[['classic','Чёрные, с красными глазками'],['cute','Милые']]]};
   const lk=looks[fl];
   pn.append(sec('Что падает',
-    selectRow('Что падает','fall',[['snow','Снег'],['leaves','Листья'],['petals','Лепестки'],['spiders','Спускаются паучки']]),
+    cards([['snow','Снег','❄️'],['leaves','Листья','🍂'],['petals','Лепестки','🌸'],['spiders','Паучки','🕷️']],k=>fl===k,k=>{cfg.fall=k;flakes=[];syncFlakes();for(const ch of chains)for(const q of ch.P)q.snow=0;changed(false);rerender()}),
     lk?selectRow('Вид',lk[0],lk[1]):null,
     slider('Сколько','snow',0,500,10,v=>v?v:'выкл'),
     slider('Размер','flake',0.4,2.5,0.1,v=>v.toFixed(1)+'×'),
-    fl==='spiders'?slider('По краям спускаются','spiderDepth',0.05,0.9,0.05,v=>'до '+Math.round(v*100)+'% экрана'):null,
+    fl==='spiders'?slider('У краёв спускаются','spiderDepth',0.05,0.9,0.05,v=>'до '+Math.round(v*100)+'% экрана'):null,
     fl==='spiders'?slider('В середине спускаются','spiderMid',0.03,0.9,0.01,v=>'до '+Math.round(v*100)+'% экрана'):null,
     fl!=='spiders'?slider('Прозрачность','fallTransp',0,0.9,0.05,v=>v?Math.round(v*100)+'%':'нет'):null,
-    fl!=='spiders'?slider('Скорость падения','fallSpeed',0.2,2.5,0.05,v=>v.toFixed(2)+'×'):null,
-    fl!=='spiders'?slider('Докуда долетает','fallDepth',0.1,1,0.05,v=>v>=1?'до низа':'тает на '+Math.round(v*100)+'% экрана'):null,
-    fl!=='spiders'?slider('Пустая зона в центре','fallClear',0,0.9,0.05,v=>v?Math.round(v*100)+'% ширины':'нет'):null,
-    fl==='snow'?check('Снег налипает на провод','stick'):null
+    fl==='snow'?check('Налипает на провод','stick'):null,
+    fl!=='spiders'?more('Ещё настройки',
+      slider('Скорость падения','fallSpeed',0.2,2.5,0.05,v=>v.toFixed(2)+'×'),
+      slider('Докуда долетает','fallDepth',0.1,1,0.05,v=>v>=1?'до низа':'тает на '+Math.round(v*100)+'% экрана'),
+      slider('Пустая зона в центре','fallClear',0,0.9,0.05,v=>v?Math.round(v*100)+'% ширины':'нет')):null
   ));
-  pn.append(sec('Паучки по краям экрана',
-    el('p',{className:'note'},'Висят у левого и правого края вдобавок к тому, что падает.'),
+  pn.append(sec('Паучки по краям',
     check('Включить','edgeSpiders'),
-    slider('Паучков с каждой стороны','edgeSpiderCount',1,4,1,v=>v),
-    selectRow('Вид паучков','spiderLook',[['classic','Чёрные, с красными глазками'],['cute','Милые, как в уютной гирлянде']]),
-    slider('Как низко спускаются','spiderDepth',0.05,0.9,0.05,v=>'до '+Math.round(v*100)+'% экрана')
+    cfg.edgeSpiders?slider('С каждой стороны','edgeSpiderCount',1,4,1,v=>v):null,
+    cfg.edgeSpiders?selectRow('Вид','spiderLook',[['classic','Чёрные, с красными глазками'],['cute','Милые']]):null,
+    cfg.edgeSpiders?slider('Как низко','spiderDepth',0.05,0.9,0.05,v=>'до '+Math.round(v*100)+'% экрана'):null
   ));
   pn.append(sec('Ветер',
-    slider('Ветер','wind',0,1.5,0.05,v=>Math.round(v*100)+'%'),
+    slider('Сила','wind',0,1.5,0.05,v=>Math.round(v*100)+'%'),
     slider('Порывы','gust',0,1.5,0.05,v=>Math.round(v*100)+'%')
   ));
+}
 
-  const login=el('input',{value:cfg.heatLogin||'',placeholder:'ник канала, например moon1rose',style:'width:100%;background:#15121b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;margin-bottom:8px'});
+function tabStream(pn){
+  const login=field({value:cfg.heatLogin||'',placeholder:'твой ник на Twitch'});
   const st=el('p',{className:'note',id:'heatst'});
   const connect=async()=>{
     const v=login.value.trim().replace(/^@/,'').toLowerCase();cfg.heatLogin=v;
@@ -1037,36 +1113,45 @@ function buildPanel(){
     else{st.textContent='Ищу канал…';try{const r=await fetch('https://decapi.me/twitch/id/'+encodeURIComponent(v));const t=(await r.text()).trim();if(!/^\d+$/.test(t)){st.textContent='Канал не найден, проверь ник';return}cfg.heatId=t}catch(e){st.textContent='Не получилось найти канал, попробуй ещё раз';return}}
     save();heatConnect();
   };
-  pn.append(sec('Дёргать со стрима',
-    el('p',{className:'note'},'Зрители дёргают провод мышкой прямо на трансляции. Нужно бесплатное Twitch-расширение на твоём канале (Панель автора → Расширения → найти → Установить → Активировать как «Оверлей»):'),
-    el('p',{className:'note'},el('b',null,'Heat'),' — только клики: клик рядом с проводом его дёргает.',el('br'),el('b',null,'GreenHeat'),' — клики и перетаскивание: зажал провод, потянул, отпустил.'),
-    selectRow('Какое расширение стоит на канале','heatProvider',[['heat','Heat (клики)'],['green','GreenHeat (клики и перетаскивание)']]),
-    login,el('div',{className:'btns'},el('button',{className:'wide',id:'heatconnect',textContent:'Подключить',on:{click:connect}})),st,
+  pn.append(sec('Зрители дёргают гирлянду',
+    el('p',{className:'note'},'Нужно бесплатное расширение на твоём Twitch: Панель автора → Расширения → найти → Установить → Активировать как «Оверлей».'),
+    cards([['green','GreenHeat — тянуть','✋'],['heat','Heat — только клик','👆']],k=>cfg.heatProvider===k,k=>{cfg.heatProvider=k;save();rerender();if(cfg.heatLogin)setTimeout(()=>document.getElementById('heatconnect')?.click(),0)}),
+    login,el('div',{className:'btns'},el('button',{className:'primary',id:'heatconnect',textContent:'Подключить',on:{click:connect}})),st,
     slider('Сила рывка','tugPower',0.3,3,0.1,v=>v.toFixed(1)+'×'),
-    check('Показывать кружок на месте клика','clickRings'),
-    el('div',{className:'btns'},el('button',{className:'wide',textContent:'Проверить: случайный клик зрителя',on:{click:()=>{const ch=chains[Math.random()*chains.length|0];if(!ch)return;const p=ch.P[Math.random()*ch.P.length|0];tugAt(p.x+(Math.random()-0.5)*40,p.y+(Math.random()-0.5)*40)}}})),
-    el('div',{className:'btns'},el('button',{className:'wide',textContent:'Проверить: зритель тянет провод',on:{click:demoDrag}})),
-    el('p',{className:'note'},'Работает у зрителей, которые смотрят с компьютера в браузере. Из-за задержки трансляции провод реагирует через пару секунд.')
+    more('Ещё настройки',
+      check('Кружок на месте клика','clickRings'),
+      el('div',{className:'btns'},el('button',{className:'wide',textContent:'Проверить: клик зрителя',on:{click:()=>{const ch=chains[Math.random()*chains.length|0];if(!ch)return;const p=ch.P[Math.random()*ch.P.length|0];tugAt(p.x+(Math.random()-0.5)*40,p.y+(Math.random()-0.5)*40)}}})),
+      el('div',{className:'btns'},el('button',{className:'wide',textContent:'Проверить: зритель тянет',on:{click:demoDrag}}))),
+    el('p',{className:'note'},'Работает у зрителей с компьютера в браузере. Из-за задержки трансляции реакция через пару секунд.')
   ));
-  heatStatus();setTimeout(linkWarn,0);
+}
 
+function tabSave(pn){
+  const url=location.origin+location.pathname+'#c='+enc(cfg);
+  const long=url.length>15000||location.protocol==='file:';
+  const ta=el('textarea',{readOnly:true,style:'display:none'});
+  const copy=()=>{const u=location.origin+location.pathname+'#c='+enc(cfg);if(u.length>15000){toast('Ссылка слишком длинная — скачай файл');return}ta.style.display='block';ta.value=u;ta.select();try{navigator.clipboard.writeText(u).then(()=>toast('Ссылка скопирована'),()=>{})}catch(e){}};
+  const fileBtn=el('button',{className:long?'primary':'wide',textContent:'Скачать файл для OBS',on:{click:download}});
+  const linkBtn=el('button',{className:long?'wide':'primary',textContent:'Скопировать ссылку для OBS',on:{click:copy}});
+  pn.append(sec('Отправить в OBS',
+    WARN(),
+    el('p',{className:'note'},long?(location.protocol==='file:'?'Ты открыла редактор из файла — сохраняй тоже файлом.':'Тебе подойдёт файл: ссылка получилась бы слишком длинной.'):'Проще всего ссылкой: её не надо хранить, обновления с сайта приходят сами.'),
+    el('div',{className:'btns'},long?fileBtn:linkBtn),
+    el('div',{className:'btns'},long?(location.protocol==='file:'?null:linkBtn):fileBtn),ta,
+    more('Как добавить в OBS',
+      el('p',{className:'note'},el('b',null,'Ссылкой: '),'Источники → «+» → Браузер → вставь ссылку в поле URL. Ширина 1920, высота 1080.'),
+      el('p',{className:'note'},el('b',null,'Файлом: '),'то же, но поставь галочку «Локальный файл» и выбери файл. Храни его в постоянной папке.'),
+      el('p',{className:'note'},'После изменений: замени ссылку (или файл) и нажми в свойствах источника «Обновить кэш текущей страницы».')),
+    more('Имя файла',field({id:'fname',value:'garland'})),
+    el('p',{className:'note'},'Подруге отправь файл или ссылку: у неё откроется этот редактор с твоими настройками.')
+  ));
   const bgFile=el('input',{type:'file',accept:'image/*',style:'display:none',on:{change:e=>{const f=e.target.files[0];if(!f)return;const fr=document.getElementById('frame');fr.className='';fr.style.backgroundImage=`url(${URL.createObjectURL(f)})`}}});
   const setBg=c=>{const fr=document.getElementById('frame');fr.style.backgroundImage='';fr.className=c};
   pn.append(sec('Фон превью',
     el('div',{className:'btns'},el('button',{textContent:'Ночь',on:{click:()=>setBg('bg-scene')}}),el('button',{textContent:'Прозрачный',on:{click:()=>setBg('bg-checker')}}),el('button',{textContent:'Светлый',on:{click:()=>setBg('bg-light')}}),el('button',{textContent:'Скрин стрима…',on:{click:()=>bgFile.click()}})),bgFile,
-    el('p',{className:'note'},'Фон только для примерки, в OBS его не будет.')
+    el('p',{className:'note'},'Только для примерки, в OBS фона не будет.')
   ));
-
-  const ta=el('textarea',{readOnly:true,style:'display:none'});
-  pn.append(sec('Сохранить',
-    el('div',{className:'row'},el('label',null,el('span',null,'Имя файла')),el('input',{id:'fname',value:'garland',style:'width:100%;background:#15121b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit'})),
-    el('div',{className:'linkwarn',style:'display:none;background:#3a2410;border:1px solid #ffb347;color:#ffd9a0;border-radius:8px;padding:8px 10px;margin:0 0 12px;font-size:12px'},el('b',null,'⚠ Ссылка не подойдёт для OBS. '),'Загруженные с компьютера гифки или картинки делают её слишком длинной, и OBS её обрежет: гирлянда покажется со стандартными настройками. Подключи в OBS ',el('b',null,'скачанный файл'),' или замени загруженные гифки на добавленные по ссылке.'),
-    el('div',{className:'btns'},el('button',{className:'primary',textContent:'Скачать файл для OBS',on:{click:download}})),
-    el('p',{className:'note'},el('b',null,'В OBS: '),'Источник → Браузер → галочка «Локальный файл» → выбери скачанный файл. Ширина 1920, высота 1080. Источник положи выше остальных слоёв.'),
-    el('p',{className:'note'},'Подруге просто отправь файл. Она откроет его в браузере, получит этот же редактор с твоими настройками, поменяет под себя и скачает свой.'),
-    el('div',{className:'btns'},el('button',{className:'wide',textContent:'Скопировать ссылку (если файл лежит на сайте)',on:{click:()=>{const url=location.origin+location.pathname+'#c='+enc(cfg);if(url.length>15000){toast('Ссылка слишком длинная из-за загруженных картинок — OBS её обрежет. Скачай файл или добавь гифки по ссылке');ta.style.display='block';ta.value='Ссылка получилась '+Math.round(url.length/1000)+' тыс. символов — OBS такую не съест. Нажми «Скачать файл для OBS» или замени загруженные гифки на добавленные по ссылке.';return}ta.style.display='block';ta.value=url;ta.select();try{navigator.clipboard.writeText(url).then(()=>toast('Ссылка скопирована'),()=>{})}catch(e){}}}})),ta,
-    el('div',{className:'btns'},el('button',{className:'wide',textContent:'Сбросить всё к начальным',on:{click:()=>{cfg=JSON.parse(JSON.stringify(DEFAULT));loadImages();flakes=[];syncFlakes();build();save();buildPanel()}}}))
-  ));
+  pn.append(more('Сбросить всё',el('div',{className:'btns'},el('button',{className:'wide danger',textContent:'Сбросить все настройки к начальным',on:{click:()=>{cfg=JSON.parse(JSON.stringify(DEFAULT));loadImages();flakes=[];syncFlakes();syncEdge();build();save();rerender()}}}))));
 }
 
 /* ---------- viewer clicks (Heat extension) ---------- */
