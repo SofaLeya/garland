@@ -83,7 +83,7 @@ const DEFAULT = {
   sag:0.07, spacing:320,
   bulbGap:34, bulbSize:13,
   palette:PALETTES['Классика'].slice(),
-  mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false,
+  mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false, czEdison:true, czCat:true, czGhost:true, czDot:true, czBead:true, czLeaf:true, czEvery:10,
   wireColor:'#1a2a1e', wire:2.5,
   images:[], imgModes:[], imgPins:{}, imgCount:1, imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
   snow:140, flake:1, stick:true, fall:'snow', fallAlpha:1, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
@@ -195,7 +195,8 @@ function imgMode(i){return (cfg.imgModes&&cfg.imgModes[i])||(cfg.imgEvery>1?'eve
 function assignImages(T){
   const at=new Array(T).fill(-1);if(!imgs.length||!T)return at;
   for(const k in (cfg.imgPins||{})){const ii=cfg.imgPins[k];if(+k<T&&ii<imgs.length)at[+k]=ii}
-  const once=[],all=[],every=[];imgs.forEach((_,i)=>{const m=imgMode(i);if(m==='manual')return;(m==='once'?once:m==='all'?all:every).push(i)});
+  const once=[],all=[],every=[],pend=[];imgs.forEach((_,i)=>{const m=imgMode(i);if(m==='manual')return;if(m==='pend'){pend.push(i);return}(m==='once'?once:m==='all'?all:every).push(i)});
+  if(pend.length){let c=0;for(let k=0;k<T;k++)if(at[k]<0&&isPendSlot(k)){at[k]=pend[c%pend.length];c++}}
   const copies=[];for(let c=0;c<Math.max(1,cfg.imgCount);c++)for(const ii of once)copies.push(ii);
   copies.forEach((ii,j)=>{let k=Math.min(T-1,Math.floor(((cfg.imgPos+j/copies.length)%1)*T));let tries=0;while(at[k]>=0&&tries<T){k=(k+1)%T;tries++}at[k]=ii});
   const pool=all.length?all.concat(every):every;if(!pool.length)return at;
@@ -406,13 +407,20 @@ function updateFlakes(t){
 
 /* ---------- halloween figures ---------- */
 const HALLOWEEN=['pumpkin','ghost','bat','cat','spider'];
+function isPendSlot(gi){const E=Math.max(3,cfg.czEvery|0);return cfg.style==='cozy'&&gi%E===Math.floor(E/2)}
 function figureOf(gi){
   const st=cfg.style;
   if(st==='halloween')return HALLOWEEN[gi%HALLOWEEN.length];
   if(HALLOWEEN.includes(st))return st;
   if(st==='cozy'){
-    if(gi%10===5)return ['edison','catlamp','edison','neonghost'][Math.floor(gi/10)%4];
-    return ['dot','bead','dot','leaf','dot','bead'][gi%6];
+    const E=Math.max(3,cfg.czEvery|0);
+    if(isPendSlot(gi)){
+      const pend=['edison','catlamp','edison','neonghost'].filter(k=>k==='edison'?cfg.czEdison:k==='catlamp'?cfg.czCat:cfg.czGhost);
+      if(pend.length)return pend[Math.floor(gi/E)%pend.length];
+    }
+    let pat=['dot','bead','dot','leaf','dot','bead'].filter(k=>k==='dot'?cfg.czDot:k==='bead'?cfg.czBead:cfg.czLeaf);
+    if(!pat.length)pat=['dot'];
+    return pat[gi%pat.length];
   }
   return 'bulb';
 }
@@ -857,6 +865,10 @@ function buildPanel(){
     el('div',{className:'row'},palSel),pal,
     selectRow('Вид','style',[['classic','Классические лампочки'],['halloween','Хэллоуин: все вперемешку'],['pumpkin','Тыквы'],['ghost','Привидения'],['bat','Летучие мыши'],['cat','Чёрные кошки'],['spider','Пауки'],['cozy','Уютная: огоньки, бусины, листья, котики-фонарики']],true),
     check('Зелёная лоза на проводе','vine'),
+    el('p',{className:'note',style:'margin:4px 0 6px'},el('b',null,'Для уютного вида — что висит:')),
+    el('div',{style:'display:grid;grid-template-columns:1fr 1fr;column-gap:8px'},check('Лампы Эдисона','czEdison',true),check('Котики-фонарики','czCat',true),check('Привидения','czGhost',true),check('Огоньки','czDot',true),check('Бусины','czBead',true),check('Листики','czLeaf',true)),
+    slider('Большие подвески: каждая N-я','czEvery',3,40,1,v=>'каждая '+v+'-я',true),
+    el('p',{className:'note'},'Заменить большие подвески на своё: загрузи картинку в «Свои картинки» и выбери под ней «вместо больших подвесок».'),
     slider('Размер фигурок (Хэллоуин)','figSize',1,4,0.1,v=>v.toFixed(1)+'×',true),
     slider('Паутинка у пауков на гирлянде','spiderThread',0.2,2,0.1,v=>v.toFixed(1)+'×',true),
     selectRow('Режим','mode',[['twinkle','Мерцание'],['steady','Горят ровно'],['chase','Бегущие огни'],['wave','Волна'],['flash','Случайные вспышки'],['cycle','Перелив цветов']]),
@@ -871,7 +883,7 @@ function buildPanel(){
   const thumbs=el('div',{className:'thumbs'});
   const drawThumbs=()=>{thumbs.innerHTML='';cfg.images.forEach((src,i)=>{
     const sel=el('select',{style:'width:96px;padding:3px;font-size:11px;margin-top:4px',on:{change:e=>{cfg.imgModes=cfg.imgModes||[];cfg.imgModes[i]=e.target.value;changed(true)}}});
-    for(const [v,l] of [['manual','где кликну'],['once','N штук'],['every','каждая N-я'],['all','вместо всех']])sel.append(el('option',{value:v,selected:imgMode(i)===v},l));
+    for(const [v,l] of [['manual','где кликну'],['once','N штук'],['every','каждая N-я'],['pend','вместо больших подвесок'],['all','вместо всех']])sel.append(el('option',{value:v,selected:imgMode(i)===v},l));
     thumbs.append(el('div',{style:'display:flex;flex-direction:column;align-items:center'},el('div',{className:'th',title:'Клик — выбрать для инструмента «Повесить картинку»',style:'width:96px;height:64px;cursor:pointer;'+(selImg===i?'outline:2px solid var(--accent);outline-offset:1px':''),on:{click:e=>{if(e.target.tagName==='B')return;selImg=i;drawThumbs()}}},el('img',{src,style:'max-width:88px;max-height:56px'}),el('b',{textContent:'×',on:{click:()=>{cfg.images.splice(i,1);if(cfg.imgModes)cfg.imgModes.splice(i,1);const np={};for(const k in (cfg.imgPins||{})){const v=cfg.imgPins[k];if(v<i)np[k]=v;else if(v>i)np[k]=v-1}cfg.imgPins=np;if(selImg>=cfg.images.length)selImg=Math.max(0,cfg.images.length-1);loadImages();drawThumbs();changed(true)}}})),sel));
   })};drawThumbsRef=drawThumbs;drawThumbs();
   const file=el('input',{type:'file',accept:'image/*',multiple:true,style:'display:none',on:{change:async e=>{for(const f of e.target.files){const d=(f.type==='image/gif'&&f.size<1500000)?await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)}):await shrinkImage(f);if(d){cfg.images.push(d);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once';selImg=cfg.images.length-1}}e.target.value='';loadImages();drawThumbs();changed(true)}}});
