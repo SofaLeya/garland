@@ -85,7 +85,7 @@ const DEFAULT = {
   palette:PALETTES['Классика'].slice(),
   mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false,
   wireColor:'#1a2a1e', wire:2.5,
-  images:[], imgModes:[], imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
+  images:[], imgModes:[], imgPins:{}, imgCount:1, imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
   snow:140, flake:1, stick:true, fall:'snow', fallAlpha:1, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
   wind:0.3, gust:0.5, heatLogin:'', heatId:'', heatProvider:'heat', tugPower:1, clickRings:true,
 };
@@ -194,8 +194,10 @@ function makeChain(A,src){
 function imgMode(i){return (cfg.imgModes&&cfg.imgModes[i])||(cfg.imgEvery>1?'every':'all')}
 function assignImages(T){
   const at=new Array(T).fill(-1);if(!imgs.length||!T)return at;
-  const once=[],all=[],every=[];imgs.forEach((_,i)=>{const m=imgMode(i);(m==='once'?once:m==='all'?all:every).push(i)});
-  once.forEach((ii,j)=>{let k=Math.min(T-1,Math.floor(((cfg.imgPos+j/once.length)%1)*T));let tries=0;while(at[k]>=0&&tries<T){k=(k+1)%T;tries++}at[k]=ii});
+  for(const k in (cfg.imgPins||{})){const ii=cfg.imgPins[k];if(+k<T&&ii<imgs.length)at[+k]=ii}
+  const once=[],all=[],every=[];imgs.forEach((_,i)=>{const m=imgMode(i);if(m==='manual')return;(m==='once'?once:m==='all'?all:every).push(i)});
+  const copies=[];for(let c=0;c<Math.max(1,cfg.imgCount);c++)for(const ii of once)copies.push(ii);
+  copies.forEach((ii,j)=>{let k=Math.min(T-1,Math.floor(((cfg.imgPos+j/copies.length)%1)*T));let tries=0;while(at[k]>=0&&tries<T){k=(k+1)%T;tries++}at[k]=ii});
   const pool=all.length?all.concat(every):every;if(!pool.length)return at;
   const N=all.length?1:Math.max(2,cfg.imgEvery);let c=0,r=0;
   for(let k=0;k<T;k++){if(at[k]>=0)continue;if(r%N===0){at[k]=pool[c%pool.length];c++}r++}
@@ -744,6 +746,17 @@ function initEditor(){
       changed(true);updHint();
     }
     else if(tool==='pull'){const h=nearestPoint(v.x,v.y,60);if(h&&!h.p.pin){grab=h.p;grab.grab=true}}
+    else if(tool==='hang'){
+      if(!cfg.images.length){toast('Сначала загрузи картинку в разделе «Свои картинки»');return}
+      cfg.imgPins=cfg.imgPins||{};
+      const bd2=b=>{const q=b.ch.P[b.i];const ex=b.x-q.x,ey=b.y-q.y,ll=ex*ex+ey*ey||1;let u=((v.x-q.x)*ex+(v.y-q.y)*ey)/ll;u=Math.max(0,Math.min(1.3,u));return Math.hypot(q.x+ex*u-v.x,q.y+ey*u-v.y)};
+      let pin=null,pd=1e9;for(const b of bulbs){if(cfg.imgPins[b.gi]==null)continue;const d=bd2(b);if(d<Math.max(45,b.s*0.5)&&d<pd){pd=d;pin=b}}
+      if(pin){delete cfg.imgPins[pin.gi];changed(true);return}
+      let best=null,bd=50;for(const b of bulbs){const d=bd2(b);if(d<bd){bd=d;best=b}}
+      if(!best)return;
+      {const si=Math.min(selImg,cfg.images.length-1);cfg.imgPins[best.gi]=si;if(imgMode(si)!=='manual'){cfg.imgModes=cfg.imgModes||[];cfg.imgModes[si]='manual';if(typeof drawThumbsRef==='function')drawThumbsRef()}}
+      changed(true);
+    }
     else if(tool==='erase'){const h=nearestPoint(v.x,v.y,40);if(h){cfg.shape.splice(h.ch.src,1);building=-1;changed(true)}}
   });
   cv.addEventListener('pointermove',e=>{const v=toVirtual(e);mouse=v;if(drawing){const l=drawing.at(-1);if(Math.hypot(v.x-l[0],v.y-l[1])>12)drawing.push([v.x,v.y])}});
@@ -755,16 +768,17 @@ function initEditor(){
   addEventListener('keydown',e=>{if(e.key==='Escape'||e.key==='Enter'){building=-1;updHint()}});
   buildTools();buildPanel();
 }
-const HINTS={draw:'Зажми мышь и веди — провод ляжет по линии и провиснет между точками.',points:'Кликай точки крепления по очереди. Клик ещё раз в последнюю точку или Esc — провод готов.',pull:'Хватай провод и дёргай — проверь физику.',erase:'Кликни по проводу, чтобы удалить его.'};
-function updHint(){const h=document.getElementById('hint');if(h)h.textContent=(tool==='points'&&building>=0)?'Ставь следующую точку. Клик в последнюю точку или Esc — закончить.':HINTS[tool];cv.style.cursor=tool==='pull'?'grab':tool==='erase'?'not-allowed':'crosshair'}
+const HINTS={hang:'Выбери картинку в разделе «Свои картинки» и кликай по лампочкам — она повиснет вместо них. Клик по повешенной картинке убирает её.',draw:'Зажми мышь и веди — провод ляжет по линии и провиснет между точками.',points:'Кликай точки крепления по очереди. Клик ещё раз в последнюю точку или Esc — провод готов.',pull:'Хватай провод и дёргай — проверь физику.',erase:'Кликни по проводу, чтобы удалить его.'};
+function updHint(){const h=document.getElementById('hint');if(h)h.textContent=(tool==='points'&&building>=0)?'Ставь следующую точку. Клик в последнюю точку или Esc — закончить.':HINTS[tool];cv.style.cursor=tool==='hang'?'copy':tool==='pull'?'grab':tool==='erase'?'not-allowed':'crosshair'}
 function buildTools(){
   const T=document.getElementById('tools');T.innerHTML='';
-  [['draw','✎ Рисовать'],['points','• По точкам'],['pull','✋ Потянуть'],['erase','✕ Стереть']].forEach(([k,l])=>{
+  [['draw','✎ Рисовать'],['points','• По точкам'],['pull','✋ Потянуть'],['erase','✕ Стереть'],['hang','🖼 Повесить картинку']].forEach(([k,l])=>{
     const b=document.createElement('button');b.textContent=l;b.className=tool===k?'on':'';b.onclick=()=>{tool=k;building=-1;buildTools()};T.appendChild(b);
   });
   const u=document.createElement('button');u.textContent='↶ Отменить';u.onclick=()=>{cfg.shape.pop();building=-1;changed(true)};T.appendChild(u);
   const s=document.createElement('span');s.id='hint';T.appendChild(s);updHint();
 }
+let selImg=0,drawThumbsRef=null;
 function changed(rebuild){if(rebuild)build();save()}
 function el(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(const k in attrs){if(k==='on')for(const ev in attrs.on)e.addEventListener(ev,attrs.on[ev]);else if(k in e&&k!=='list')e[k]=attrs[k];else e.setAttribute(k,attrs[k])}for(const c of kids)if(c!=null)e.append(c);return e}
 function sec(title,...kids){return el('div',{className:'sec'},el('h2',null,title),...kids)}
@@ -857,18 +871,20 @@ function buildPanel(){
   const thumbs=el('div',{className:'thumbs'});
   const drawThumbs=()=>{thumbs.innerHTML='';cfg.images.forEach((src,i)=>{
     const sel=el('select',{style:'width:96px;padding:3px;font-size:11px;margin-top:4px',on:{change:e=>{cfg.imgModes=cfg.imgModes||[];cfg.imgModes[i]=e.target.value;changed(true)}}});
-    for(const [v,l] of [['once','одна штука'],['every','каждая N-я'],['all','вместо всех']])sel.append(el('option',{value:v,selected:imgMode(i)===v},l));
-    thumbs.append(el('div',{style:'display:flex;flex-direction:column;align-items:center'},el('div',{className:'th',style:'width:96px;height:64px'},el('img',{src,style:'max-width:88px;max-height:56px'}),el('b',{textContent:'×',on:{click:()=>{cfg.images.splice(i,1);if(cfg.imgModes)cfg.imgModes.splice(i,1);loadImages();drawThumbs();changed(true)}}})),sel));
-  })};drawThumbs();
-  const file=el('input',{type:'file',accept:'image/*',multiple:true,style:'display:none',on:{change:async e=>{for(const f of e.target.files){const d=(f.type==='image/gif'&&f.size<1500000)?await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)}):await shrinkImage(f);if(d){cfg.images.push(d);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once'}}e.target.value='';loadImages();drawThumbs();changed(true)}}});
+    for(const [v,l] of [['manual','где кликну'],['once','N штук'],['every','каждая N-я'],['all','вместо всех']])sel.append(el('option',{value:v,selected:imgMode(i)===v},l));
+    thumbs.append(el('div',{style:'display:flex;flex-direction:column;align-items:center'},el('div',{className:'th',title:'Клик — выбрать для инструмента «Повесить картинку»',style:'width:96px;height:64px;cursor:pointer;'+(selImg===i?'outline:2px solid var(--accent);outline-offset:1px':''),on:{click:e=>{if(e.target.tagName==='B')return;selImg=i;drawThumbs()}}},el('img',{src,style:'max-width:88px;max-height:56px'}),el('b',{textContent:'×',on:{click:()=>{cfg.images.splice(i,1);if(cfg.imgModes)cfg.imgModes.splice(i,1);const np={};for(const k in (cfg.imgPins||{})){const v=cfg.imgPins[k];if(v<i)np[k]=v;else if(v>i)np[k]=v-1}cfg.imgPins=np;if(selImg>=cfg.images.length)selImg=Math.max(0,cfg.images.length-1);loadImages();drawThumbs();changed(true)}}})),sel));
+  })};drawThumbsRef=drawThumbs;drawThumbs();
+  const file=el('input',{type:'file',accept:'image/*',multiple:true,style:'display:none',on:{change:async e=>{for(const f of e.target.files){const d=(f.type==='image/gif'&&f.size<1500000)?await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)}):await shrinkImage(f);if(d){cfg.images.push(d);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once';selImg=cfg.images.length-1}}e.target.value='';loadImages();drawThumbs();changed(true)}}});
   pn.append(sec('Свои картинки',
     el('p',{className:'note'},'Котики, сердечки, логотип — любая картинка станет лампочкой. Лучше PNG с прозрачным фоном.'),
     thumbs,file,el('div',{className:'btns'},el('button',{className:'wide',textContent:'+ Загрузить картинки или гифки',on:{click:()=>file.click()}})),
     (()=>{const u=el('input',{placeholder:'или вставь ссылку на картинку/гифку',style:'width:100%;background:#15121b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;margin-bottom:6px'});
       return el('div',{className:'row'},u,el('button',{className:'wide',textContent:'Добавить по ссылке',on:{click:()=>{const v=u.value.trim();if(!/^https?:\/\//.test(v)){toast('Нужна ссылка, начинающаяся с https://');return}cfg.images.push(v);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once';u.value='';loadImages();drawThumbs();changed(true)}}}))})(),
     el('p',{className:'note'},'Гифки двигаются. Загруженная гифка сильно удлиняет ссылку для OBS, поэтому для гифок лучше «Скачать файл для OBS» или добавлять гифку по ссылке.'),
-    slider('N для «каждая N-я»','imgEvery',2,8,1,v=>'каждая '+Math.max(2,v)+'-я',true),
-    slider('Где висят «одна штука»','imgPos',0,0.99,0.01,v=>v<0.2?'слева':v>0.8?'справа':v>0.4&&v<0.6?'посередине':Math.round(v*100)+'%',true),
+    el('p',{className:'note'},el('b',null,'Заменить конкретные лампочки: '),'выбери картинку (клик по миниатюре), включи инструмент «🖼 Повесить картинку» над превью и кликай по лампочкам.'),
+    slider('Сколько штук (для «N штук»)','imgCount',1,12,1,v=>v,true),
+    slider('N для «каждая N-я»','imgEvery',2,40,1,v=>'каждая '+Math.max(2,v)+'-я',true),
+    slider('Откуда начинаются «N штук»','imgPos',0,0.99,0.01,v=>v<0.2?'слева':v>0.8?'справа':v>0.4&&v<0.6?'посередине':Math.round(v*100)+'%',true),
     slider('Размер картинок','imgSize',1,10,0.1,v=>v.toFixed(1)+'×',true),
     check('Подсветка вокруг картинок','imgGlow')
   ));
