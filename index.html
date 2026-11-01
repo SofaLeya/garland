@@ -806,7 +806,11 @@ function buildTools(){
   const s=document.createElement('span');s.id='hint';T.appendChild(s);updHint();
 }
 let selImg=0,drawThumbsRef=null;
-function changed(rebuild){if(rebuild)build();save()}
+function linkWarn(){
+  const long=(location.origin+location.pathname+'#c='+enc(cfg)).length>15000;
+  document.querySelectorAll('.linkwarn').forEach(e=>e.style.display=long?'block':'none');
+}
+function changed(rebuild){if(rebuild)build();save();clearTimeout(linkWarn.t);linkWarn.t=setTimeout(linkWarn,300)}
 function el(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(const k in attrs){if(k==='on')for(const ev in attrs.on)e.addEventListener(ev,attrs.on[ev]);else if(k in e&&k!=='list')e[k]=attrs[k];else e.setAttribute(k,attrs[k])}for(const c of kids)if(c!=null)e.append(c);return e}
 function sec(title,...kids){return el('div',{className:'sec'},el('h2',null,title),...kids)}
 function slider(label,key,min,max,stp,fmt,rb){
@@ -911,6 +915,7 @@ function buildPanel(){
     thumbs,file,el('div',{className:'btns'},el('button',{className:'wide',textContent:'+ Загрузить картинки или гифки',on:{click:()=>file.click()}})),
     (()=>{const u=el('input',{placeholder:'или вставь ссылку на картинку/гифку',style:'width:100%;background:#15121b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;margin-bottom:6px'});
       return el('div',{className:'row'},u,el('button',{className:'wide',textContent:'Добавить по ссылке',on:{click:()=>{const v=u.value.trim();if(!/^https?:\/\//.test(v)){toast('Нужна ссылка, начинающаяся с https://');return}cfg.images.push(v);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once';u.value='';loadImages();drawThumbs();changed(true)}}}))})(),
+    el('div',{className:'linkwarn',style:'display:none;background:#3a2410;border:1px solid #ffb347;color:#ffd9a0;border-radius:8px;padding:8px 10px;margin:0 0 12px;font-size:12px'},el('b',null,'⚠ Ссылка не подойдёт для OBS. '),'Загруженные с компьютера гифки или картинки делают её слишком длинной, и OBS её обрежет: гирлянда покажется со стандартными настройками. Подключи в OBS ',el('b',null,'скачанный файл'),' или замени загруженные гифки на добавленные по ссылке.'),
     el('p',{className:'note'},'Гифки двигаются. Загруженная гифка сильно удлиняет ссылку для OBS, поэтому для гифок лучше «Скачать файл для OBS» или добавлять гифку по ссылке.'),
     el('p',{className:'note'},el('b',null,'Заменить конкретные лампочки: '),'выбери картинку (клик по миниатюре), включи инструмент «🖼 Повесить картинку» над превью и кликай по лампочкам.'),
     slider('Сколько штук (для «N штук»)','imgCount',1,12,1,v=>v,true),
@@ -972,7 +977,7 @@ function buildPanel(){
     el('div',{className:'btns'},el('button',{className:'wide',textContent:'Проверить: зритель тянет провод',on:{click:demoDrag}})),
     el('p',{className:'note'},'Работает у зрителей, которые смотрят с компьютера в браузере. Из-за задержки трансляции провод реагирует через пару секунд.')
   ));
-  heatStatus();
+  heatStatus();setTimeout(linkWarn,0);
 
   const bgFile=el('input',{type:'file',accept:'image/*',style:'display:none',on:{change:e=>{const f=e.target.files[0];if(!f)return;const fr=document.getElementById('frame');fr.className='';fr.style.backgroundImage=`url(${URL.createObjectURL(f)})`}}});
   const setBg=c=>{const fr=document.getElementById('frame');fr.style.backgroundImage='';fr.className=c};
@@ -984,6 +989,7 @@ function buildPanel(){
   const ta=el('textarea',{readOnly:true,style:'display:none'});
   pn.append(sec('Сохранить',
     el('div',{className:'row'},el('label',null,el('span',null,'Имя файла')),el('input',{id:'fname',value:'garland',style:'width:100%;background:#15121b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit'})),
+    el('div',{className:'linkwarn',style:'display:none;background:#3a2410;border:1px solid #ffb347;color:#ffd9a0;border-radius:8px;padding:8px 10px;margin:0 0 12px;font-size:12px'},el('b',null,'⚠ Ссылка не подойдёт для OBS. '),'Загруженные с компьютера гифки или картинки делают её слишком длинной, и OBS её обрежет: гирлянда покажется со стандартными настройками. Подключи в OBS ',el('b',null,'скачанный файл'),' или замени загруженные гифки на добавленные по ссылке.'),
     el('div',{className:'btns'},el('button',{className:'primary',textContent:'Скачать файл для OBS',on:{click:download}})),
     el('p',{className:'note'},el('b',null,'В OBS: '),'Источник → Браузер → галочка «Локальный файл» → выбери скачанный файл. Ширина 1920, высота 1080. Источник положи выше остальных слоёв.'),
     el('p',{className:'note'},'Подруге просто отправь файл. Она откроет его в браузере, получит этот же редактор с твоими настройками, поменяет под себя и скачает свой.'),
