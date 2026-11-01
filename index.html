@@ -132,13 +132,14 @@ async function decodeGif(src){
   for(let i=0;i<n;i++){const r=await dec.decode({frameIndex:i});out.push({bmp:await createImageBitmap(r.image),dur:Math.max(20,(r.image.duration||100000)/1000)});r.image.close()}
   dec.close();return out;
 }
-function measureImg(o,srcs){try{
+function measureImg(o,srcs,fullFrame){try{
   const N=96,c=document.createElement('canvas');c.width=c.height=N;const g=c.getContext('2d',{willReadFrequently:true});
   let x0=N,y0=N,x1=-1,y1=-1;
   for(const im of srcs){g.clearRect(0,0,N,N);g.drawImage(im,0,0,N,N);const d=g.getImageData(0,0,N,N).data;
     for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(d[(y*N+x)*4+3]>30){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}
   if(x1<0)return;
-  o.bb=[x0/N,y0/N,(x1-x0+1)/N,(y1-y0+1)/N];
+  // for a GIF we could only see the first frame: keep the full width so later frames are not clipped
+  o.bb=fullFrame?[0,y0/N,1,1-y0/N]:[x0/N,y0/N,(x1-x0+1)/N,(y1-y0+1)/N];
   g.clearRect(0,0,N,N);g.drawImage(srcs[0],0,0,N,N);const d=g.getImageData(0,0,N,N).data;
   for(let y=y0;y<=y1;y++){let sx=0,n=0;for(let x=x0;x<=x1;x++)if(d[(y*N+x)*4+3]>30){sx+=x;n++}if(n){o.ax=((sx/n+0.5)/N-o.bb[0])/o.bb[2];break}}
 }catch(e){}}
@@ -147,7 +148,8 @@ function loadImages(){
   imgs=cfg.images.map(src=>{
     const o={img:new Image(),hex:'#ffffff',ok:false};
     o.img.onload=()=>{o.ok=true;try{const c=document.createElement('canvas');c.width=c.height=8;const g=c.getContext('2d');g.drawImage(o.img,0,0,8,8);const d=g.getImageData(0,0,8,8).data;let r=0,gg=0,b=0,n=0;for(let i=0;i<d.length;i+=4){const a=d[i+3]/255;r+=d[i]*a;gg+=d[i+1]*a;b+=d[i+2]*a;n+=a}if(n>0){const t=x=>Math.min(255,Math.round(x/n*1.15)).toString(16).padStart(2,'0');o.hex='#'+t(r)+t(gg)+t(b)}}catch(e){}};
-    o.img.addEventListener('load',()=>{measureImg(o,[o.img])});
+    const isGif=/^data:image\/gif|\.gif(\?|$)/i.test(src);
+    o.img.addEventListener('load',()=>{if(!o.frames)measureImg(o,[o.img],isGif)});
     o.ax=0.5;o.bb=[0,0,1,1];o.frames=null;
     if(/^data:image\/gif|\.gif(\?|$)/i.test(src)&&'ImageDecoder' in window)decodeGif(src).then(fr=>{if(fr&&fr.length>1){o.frames=fr;o.total=fr.reduce((a,f)=>a+f.dur,0);measureImg(o,fr.map(f=>f.bmp))}}).catch(()=>{});
     o.img.crossOrigin='anonymous';o.img.src=src;return o;
