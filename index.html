@@ -125,12 +125,69 @@ function glowSprite(hex){
 const flakeSprite=(()=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d');const gr=g.createRadialGradient(16,16,0,16,16,16);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.45,'rgba(255,255,255,.8)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,32,32);return c})();
 
 let imgs=[]; // {img, hex, ok}
+async function gifBytes(src){
+  if(src.startsWith('data:')){const b=atob(src.slice(src.indexOf(',')+1));const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+  return new Uint8Array(await (await fetch(src)).arrayBuffer());
+}
+// self-contained GIF decoder (works in any browser, including the one inside OBS)
+function parseGif(d){
+  let p=0;const u8=()=>d[p++],u16=()=>{const v=d[p]|(d[p+1]<<8);p+=2;return v};
+  if(String.fromCharCode(d[0],d[1],d[2])!=='GIF')throw 0;p=6;
+  const W=u16(),H=u16(),fl=u8();u8();u8();
+  let gct=null;if(fl&0x80){const n=2<<(fl&7);gct=d.subarray(p,p+n*3);p+=n*3}
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d',{willReadFrequently:true});
+  const frames=[];let delay=100,trans=-1,disp=0;let prev=null;
+  while(p<d.length){
+    const b=u8();
+    if(b===0x3B)break;
+    if(b===0x21){const lbl=u8();
+      if(lbl===0xF9){u8();const f=u8();delay=u16()*10||100;const ti=u8();trans=(f&1)?ti:-1;disp=(f>>2)&7;u8()}
+      else{let sz;while((sz=u8()))p+=sz}
+      continue}
+    if(b!==0x2C)break;
+    const x=u16(),y=u16(),w=u16(),h=u16(),f=u8();
+    let ct=gct;if(f&0x80){const n=2<<(f&7);ct=d.subarray(p,p+n*3);p+=n*3}
+    const inter=f&0x40,mcs=u8();
+    const chunks=[];let tot=0,sz;while((sz=u8())){chunks.push(d.subarray(p,p+sz));tot+=sz;p+=sz}
+    const data=new Uint8Array(tot);{let o=0;for(const c of chunks){data.set(c,o);o+=c.length}}
+    const px=lzw(data,mcs,w*h);
+    if(disp===3)prev=g.getImageData(0,0,W,H);
+    const img=g.getImageData(x,y,w,h),id=img.data;
+    const rows=[];if(inter){for(const [st,stp] of [[0,8],[4,8],[2,4],[1,2]])for(let r=st;r<h;r+=stp)rows.push(r)}else for(let r=0;r<h;r++)rows.push(r);
+    for(let i=0;i<h;i++){const r=rows[i];for(let c=0;c<w;c++){const ci=px[i*w+c];if(ci===trans||ci===undefined)continue;const o=(r*w+c)*4;id[o]=ct[ci*3];id[o+1]=ct[ci*3+1];id[o+2]=ct[ci*3+2];id[o+3]=255}}
+    g.putImageData(img,x,y);
+    const fc=document.createElement('canvas');fc.width=W;fc.height=H;fc.getContext('2d').drawImage(cv,0,0);
+    frames.push({bmp:fc,dur:Math.max(20,delay)});
+    if(disp===2)g.clearRect(x,y,w,h);else if(disp===3&&prev)g.putImageData(prev,0,0);
+    delay=100;trans=-1;disp=0;
+  }
+  return frames;
+}
+function lzw(data,mcs,npix){
+  const out=new Uint8Array(npix);const clear=1<<mcs,eoi=clear+1;
+  let size=mcs+1,mask=(1<<size)-1,next=eoi+1,old=-1;
+  const prefix=new Int32Array(4096),suffix=new Uint8Array(4096),stack=new Uint8Array(4097);
+  for(let i=0;i<clear;i++)suffix[i]=i;
+  let bits=0,acc=0,pi=0,op=0,first=0;
+  while(op<npix){
+    while(bits<size){if(pi>=data.length)return out;acc|=data[pi++]<<bits;bits+=8}
+    let code=acc&mask;acc>>=size;bits-=size;
+    if(code===clear){size=mcs+1;mask=(1<<size)-1;next=eoi+1;old=-1;continue}
+    if(code===eoi)break;
+    if(old===-1){out[op++]=suffix[code];old=code;first=code;continue}
+    let c=code,sp=0;
+    if(code>=next){stack[sp++]=first;c=old}
+    while(c>=clear){stack[sp++]=suffix[c];c=prefix[c]}
+    first=suffix[c];stack[sp++]=first;
+    while(sp&&op<npix)out[op++]=stack[--sp];
+    if(next<4096){prefix[next]=old;suffix[next]=first;next++;if((next&mask)===0&&next<4096){size++;mask=(1<<size)-1}}
+    old=code;
+  }
+  return out;
+}
 async function decodeGif(src){
-  const data=await (await fetch(src)).arrayBuffer();
-  const dec=new ImageDecoder({data,type:'image/gif'});await dec.tracks.ready;
-  const n=dec.tracks.selectedTrack.frameCount,out=[];
-  for(let i=0;i<n;i++){const r=await dec.decode({frameIndex:i});out.push({bmp:await createImageBitmap(r.image),dur:Math.max(20,(r.image.duration||100000)/1000)});r.image.close()}
-  dec.close();return out;
+  const fr=parseGif(await gifBytes(src));
+  return fr;
 }
 function measureImg(o,srcs,fullFrame){try{
   const N=96,c=document.createElement('canvas');c.width=c.height=N;const g=c.getContext('2d',{willReadFrequently:true});
@@ -151,7 +208,7 @@ function loadImages(){
     const isGif=/^data:image\/gif|\.gif(\?|$)/i.test(src);
     o.img.addEventListener('load',()=>{if(!o.frames)measureImg(o,[o.img],isGif)});
     o.ax=0.5;o.bb=[0,0,1,1];o.frames=null;
-    if(/^data:image\/gif|\.gif(\?|$)/i.test(src)&&'ImageDecoder' in window)decodeGif(src).then(fr=>{if(fr&&fr.length>1){o.frames=fr;o.total=fr.reduce((a,f)=>a+f.dur,0);measureImg(o,fr.map(f=>f.bmp))}}).catch(()=>{});
+    if(/^data:image\/gif|\.gif(\?|$)/i.test(src))decodeGif(src).then(fr=>{if(fr&&fr.length>1){o.frames=fr;o.total=fr.reduce((a,f)=>a+f.dur,0);measureImg(o,fr.map(f=>f.bmp))}}).catch(()=>{});
     o.img.crossOrigin='anonymous';o.img.src=src;return o;
   });
 }
