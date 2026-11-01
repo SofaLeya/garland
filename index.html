@@ -85,7 +85,7 @@ const DEFAULT = {
   palette:PALETTES['Классика'].slice(),
   mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false, czEdison:true, czCat:true, czGhost:true, czDot:true, czBead:true, czLeaf:true, czEvery:10,
   wireColor:'#1a2a1e', wire:2.5,
-  images:[], imgModes:[], imgPins:{}, imgCount:1, imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
+  images:[], imgModes:[], imgSizes:[], imgPins:{}, imgCount:1, imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
   snow:140, flake:1, stick:true, fall:'snow', snowLook:'soft', leafLook:'mix', petalLook:'pinkred', fallTransp:0, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
   wind:0.3, gust:0.5, heatLogin:'', heatId:'', heatProvider:'heat', tugPower:1, clickRings:true,
 };
@@ -221,7 +221,7 @@ function build(){
         const p=ch.P[i];
         const imgIdx=imgAt[gi];const isImg=imgIdx>=0;
         const kind=isImg?'img':figureOf(gi);
-        const s=cfg.bulbSize*(isImg?cfg.imgSize:kind==='bulb'?1:cfg.figSize*(FIG[kind].sz||1));
+        const s=cfg.bulbSize*(isImg?cfg.imgSize*((cfg.imgSizes&&cfg.imgSizes[imgIdx])||1):kind==='bulb'?1:cfg.figSize*(FIG[kind].sz||1));
         const cordL=FIG[kind].cord?s*(0.6+hash(gi*3.7)*1.1):0;
         const len=kind==='spider'?s*(0.35+1.05*cfg.spiderThread):FIG[kind].cord?cordL+s*(kind==='edison'?0.75:0.55):s*FIG[kind].len;
         bulbs.push({ch,i,x:p.x,y:p.y+len,px:p.x,py:p.y+len,len,s,gi,kind,cord:cordL,img:imgIdx,ph:Math.random()*6.283,fr:0.6+Math.random()*0.9});
@@ -903,7 +903,7 @@ function buildPanel(){
   const drawThumbs=()=>{thumbs.innerHTML='';cfg.images.forEach((src,i)=>{
     const sel=el('select',{style:'width:96px;padding:3px;font-size:11px;margin-top:4px',on:{change:e=>{cfg.imgModes=cfg.imgModes||[];cfg.imgModes[i]=e.target.value;changed(true)}}});
     for(const [v,l] of [['manual','где кликну'],['once','N штук'],['every','каждая N-я'],['pend','вместо больших подвесок'],['all','вместо всех']])sel.append(el('option',{value:v,selected:imgMode(i)===v},l));
-    thumbs.append(el('div',{style:'display:flex;flex-direction:column;align-items:center'},el('div',{className:'th',title:'Клик — выбрать для инструмента «Повесить картинку»',style:'width:96px;height:64px;cursor:pointer;'+(selImg===i?'outline:2px solid var(--accent);outline-offset:1px':''),on:{click:e=>{if(e.target.tagName==='B')return;selImg=i;drawThumbs()}}},el('img',{src,style:'max-width:88px;max-height:56px'}),el('b',{textContent:'×',on:{click:()=>{cfg.images.splice(i,1);if(cfg.imgModes)cfg.imgModes.splice(i,1);const np={};for(const k in (cfg.imgPins||{})){const v=cfg.imgPins[k];if(v<i)np[k]=v;else if(v>i)np[k]=v-1}cfg.imgPins=np;if(selImg>=cfg.images.length)selImg=Math.max(0,cfg.images.length-1);loadImages();drawThumbs();changed(true)}}})),sel));
+    thumbs.append(el('div',{style:'display:flex;flex-direction:column;align-items:center'},el('div',{className:'th',title:'Клик — выбрать для инструмента «Повесить картинку»',style:'width:96px;height:64px;cursor:pointer;'+(selImg===i?'outline:2px solid var(--accent);outline-offset:1px':''),on:{click:e=>{if(e.target.tagName==='B')return;selImg=i;drawThumbs()}}},el('img',{src,style:'max-width:88px;max-height:56px'}),el('b',{textContent:'×',on:{click:()=>{cfg.images.splice(i,1);if(cfg.imgModes)cfg.imgModes.splice(i,1);if(cfg.imgSizes)cfg.imgSizes.splice(i,1);const np={};for(const k in (cfg.imgPins||{})){const v=cfg.imgPins[k];if(v<i)np[k]=v;else if(v>i)np[k]=v-1}cfg.imgPins=np;if(selImg>=cfg.images.length)selImg=Math.max(0,cfg.images.length-1);loadImages();drawThumbs();changed(true)}}})),sel,(()=>{const cur=(cfg.imgSizes&&cfg.imgSizes[i])||1;const lab=el('span',{style:'font-size:11px;color:var(--muted)'},'размер '+cur.toFixed(1)+'×');const r=el('input',{type:'range',min:0.2,max:3,step:0.1,value:cur,style:'width:96px',on:{input:e=>{cfg.imgSizes=cfg.imgSizes||[];cfg.imgSizes[i]=+e.target.value;lab.textContent='размер '+cfg.imgSizes[i].toFixed(1)+'×';changed(true)}}});return el('div',{style:'display:flex;flex-direction:column;align-items:center;margin-top:4px'},lab,r)})()));
   })};drawThumbsRef=drawThumbs;drawThumbs();
   const file=el('input',{type:'file',accept:'image/*',multiple:true,style:'display:none',on:{change:async e=>{for(const f of e.target.files){const d=(f.type==='image/gif'&&f.size<1500000)?await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)}):await shrinkImage(f);if(d){cfg.images.push(d);cfg.imgModes=cfg.imgModes||[];cfg.imgModes[cfg.images.length-1]='once';selImg=cfg.images.length-1}}e.target.value='';loadImages();drawThumbs();changed(true)}}});
   pn.append(sec('Свои картинки',
@@ -916,7 +916,7 @@ function buildPanel(){
     slider('Сколько штук (для «N штук»)','imgCount',1,12,1,v=>v,true),
     slider('N для «каждая N-я»','imgEvery',2,40,1,v=>'каждая '+Math.max(2,v)+'-я',true),
     slider('Откуда начинаются «N штук»','imgPos',0,0.99,0.01,v=>v<0.2?'слева':v>0.8?'справа':v>0.4&&v<0.6?'посередине':Math.round(v*100)+'%',true),
-    slider('Размер картинок','imgSize',1,10,0.1,v=>v.toFixed(1)+'×',true),
+    slider('Размер всех картинок','imgSize',1,10,0.1,v=>v.toFixed(1)+'×',true),
     check('Подсветка вокруг картинок','imgGlow')
   ));
 
