@@ -86,7 +86,7 @@ const DEFAULT = {
   mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false, czEdison:true, czCat:true, czGhost:true, czDot:true, czBead:true, czLeaf:true, czEvery:10,
   wireColor:'#1a2a1e', wire:2.5,
   images:[], imgModes:[], imgPins:{}, imgCount:1, imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
-  snow:140, flake:1, stick:true, fall:'snow', snowLook:'soft', leafLook:'mix', petalLook:'pinkred', fallAlpha:1, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
+  snow:140, flake:1, stick:true, fall:'snow', snowLook:'soft', leafLook:'mix', petalLook:'pinkred', fallTransp:0, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
   wind:0.3, gust:0.5, heatLogin:'', heatId:'', heatProvider:'heat', tugPower:1, clickRings:true,
 };
 
@@ -99,6 +99,7 @@ function loadCfg(){
   if(m){try{c=dec(m[1])}catch(e){}}
   if(!c){try{c=JSON.parse(document.getElementById('cfg').textContent)}catch(e){}}
   if(!c&&EDIT){try{c=JSON.parse(localStorage.getItem('garland-cfg'))}catch(e){}}
+  if(c&&c.fallAlpha!=null&&c.fallTransp==null)c.fallTransp=Math.max(0,Math.min(0.9,1-c.fallAlpha));
   return Object.assign(JSON.parse(JSON.stringify(DEFAULT)),c||{});
 }
 let cfg=loadCfg();
@@ -319,7 +320,7 @@ const whitePetalSprites=makeSprites(['#ffffff','#fff6f0','#f6f0ff'],(g,c,S)=>{co
 function pick(a){return a[Math.random()*a.length|0]}
 function fallFade(f){
   if(f.kind==='spiders')return 1;
-  let a=f.tmp?1:cfg.fallAlpha;
+  let a=f.tmp?1:1-(cfg.fallTransp||0);
   if(cfg.fallDepth<1&&!f.tmp){const L=VH*cfg.fallDepth;const st=L*0.55;if(f.y>st)a*=Math.max(0,1-(f.y-st)/(L-st))}
   if(cfg.fallClear>0&&!f.tmp){const u=Math.abs(f.x/VW-0.5)*2;const c=cfg.fallClear;if(u<c){const e=c*0.55;a*=u<e?0:(u-e)/(c-e)}}
   return a;
@@ -832,7 +833,7 @@ function setLayers(n){
   const v=document.getElementById('layersval');if(v)v.textContent=n;
 }
 function applyCozy(){
-  Object.assign(cfg,{palette:['#ffd58a'],spiderLook:'cute',style:'cozy',vine:true,wireColor:'#6b5548',wire:2,sag:0.06,bulbGap:30,fall:'leaves',snow:60,fallAlpha:0.85,fallDepth:0.45,fallSpeed:0.7,stick:false,bulbSize:13,figSize:2,mode:'twinkle',speed:0.5,glow:0.9,
+  Object.assign(cfg,{palette:['#ffd58a'],spiderLook:'cute',style:'cozy',vine:true,wireColor:'#6b5548',wire:2,sag:0.06,bulbGap:30,fall:'leaves',snow:60,fallTransp:0.15,fallDepth:0.45,fallSpeed:0.7,stick:false,bulbSize:13,figSize:2,mode:'twinkle',speed:0.5,glow:0.9,
     shape:[0,1,2].map(layerPath)});
   building=-1;build();flakes=[];syncFlakes();save();buildPanel();
 }
@@ -932,7 +933,7 @@ function buildPanel(){
     slider('Размер','flake',0.4,2.5,0.1,v=>v.toFixed(1)+'×'),
     fl==='spiders'?slider('По краям спускаются','spiderDepth',0.05,0.9,0.05,v=>'до '+Math.round(v*100)+'% экрана'):null,
     fl==='spiders'?slider('В середине спускаются','spiderMid',0.03,0.9,0.01,v=>'до '+Math.round(v*100)+'% экрана'):null,
-    fl!=='spiders'?slider('Прозрачность','fallAlpha',0.1,1,0.05,v=>Math.round(v*100)+'%'):null,
+    fl!=='spiders'?slider('Прозрачность','fallTransp',0,0.9,0.05,v=>v?Math.round(v*100)+'%':'нет'):null,
     fl!=='spiders'?slider('Скорость падения','fallSpeed',0.2,2.5,0.05,v=>v.toFixed(2)+'×'):null,
     fl!=='spiders'?slider('Докуда долетает','fallDepth',0.1,1,0.05,v=>v>=1?'до низа':'тает на '+Math.round(v*100)+'% экрана'):null,
     fl!=='spiders'?slider('Пустая зона в центре','fallClear',0,0.9,0.05,v=>v?Math.round(v*100)+'% ширины':'нет'):null,
