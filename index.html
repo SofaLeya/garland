@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Гирлянда для OBS</title>
+<meta name="garland-version" content="2026-11-02.1">
 <style>
 :root{--bg:#121018;--panel:#1b1822;--panel2:#24202d;--line:#332d3e;--text:#efeaf5;--muted:#9c94ab;--accent:#ffb347;--accent-ink:#2a1a05;--danger:#ff6b7d}
 *{box-sizing:border-box}
@@ -87,8 +88,28 @@ button.danger{color:var(--danger)}
 <div id="toast"></div>
 <script id="cfg" type="application/json">null</script>
 <script>
+/* Downloaded copies update themselves: fetch the latest editor from the site and reopen it with this file's settings */
+(function(){
+  if(location.protocol!=='file:')return;
+  var SITE='https://sofaleya.github.io/garland/';
+  var mine=(document.querySelector('meta[name="garland-version"]')||{}).content||'';
+  fetch(SITE+'?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():null}).then(function(t){
+    if(!t)return;var m=t.match(/name="garland-version" content="([^"]+)"/);if(!m||m[1]===mine)return;
+    var open='<scr'+'ipt id="cfg" type="application/json">',close='</scr'+'ipt>';var i=t.indexOf(open);if(i<0)return;var j=t.indexOf(close,i);
+    var cfgText=document.getElementById('cfg').textContent;
+    var html=t.slice(0,i+open.length)+cfgText+t.slice(j);
+    html=html.replace('<head>','<head><base href="'+SITE+'"><script>window.__garlandFile='+JSON.stringify(location.href)+'<\/script>');
+    location.replace(URL.createObjectURL(new Blob([html],{type:'text/html'})));
+  }).catch(function(){});
+})();
+</script>
+<script>
 'use strict';
 const PRISTINE = '<!doctype html>\n' + document.documentElement.outerHTML;
+const SITE_URL='https://sofaleya.github.io/garland/';
+const IS_WEB=/^https?:$/.test(location.protocol);
+const LINK_BASE=IS_WEB?location.origin+location.pathname:SITE_URL;
+const FROM_FILE=!IS_WEB;
 const qs = new URLSearchParams(location.search);
 const IN_OBS = !!window.obsstudio;
 const EDIT = qs.has('edit') || (!IN_OBS && !qs.has('view'));
@@ -906,7 +927,7 @@ function buildTools(){
 }
 let selImg=0,drawThumbsRef=null,dupBrush=null;
 function linkWarn(){
-  const long=(location.origin+location.pathname+'#c='+enc(cfg)).length>15000;
+  const long=(LINK_BASE+'#c='+enc(cfg)).length>15000;
   document.querySelectorAll('.linkwarn').forEach(e=>e.style.display=long?'block':'none');
 }
 function changed(rebuild){if(rebuild)build();save();clearTimeout(linkWarn.t);linkWarn.t=setTimeout(linkWarn,300)}
@@ -979,7 +1000,7 @@ const WARN=()=>el('div',{className:'linkwarn',style:'display:none;background:#3a
 function buildPanel(){
   const pn=document.getElementById('panel');pn.innerHTML='';
   pn.append(el('h1',null,'Гирлянда'),el('p',{className:'sub'},'Виджет для OBS'));
-  if(location.protocol==='file:')pn.append(el('div',{style:'background:#1f2a3a;border:1px solid #4a6a9a;color:#cfe0ff;border-radius:8px;padding:8px 10px;margin:0 0 10px;font-size:12px'},'Это сохранённая копия редактора. Самая новая версия — на ',el('b',null,'sofaleya.github.io/garland'),': открой её, вкладка «Сохранить» → «Загрузить настройки из файла».'));
+  if(FROM_FILE)pn.append(el('div',{style:'background:#1f2a3a;border:1px solid #4a6a9a;color:#cfe0ff;border-radius:8px;padding:8px 10px;margin:0 0 10px;font-size:12px'},'Это твой сохранённый файл. Новые функции он сам подтягивает с сайта, когда есть интернет. Изменения сохраняй кнопкой «Скачать файл» во вкладке «Сохранить».'));
   pn.append(el('div',{className:'tabs'},...TABS.map(([k,l])=>el('button',{className:panelTab===k?'on':'',textContent:l,on:{click:()=>{panelTab=k;try{localStorage.setItem('garland-tab',k)}catch(e){}pn.scrollTop=0;buildPanel()}}}))));
   const T={shape:tabShape,hang:tabHang,weather:tabWeather,stream:tabStream,save:tabSave}[panelTab]||tabShape;
   T(pn);
@@ -1128,17 +1149,17 @@ function tabStream(pn){
 }
 
 function tabSave(pn){
-  const url=location.origin+location.pathname+'#c='+enc(cfg);
-  const long=url.length>15000||location.protocol==='file:';
+  const url=LINK_BASE+'#c='+enc(cfg);
+  const long=url.length>15000||FROM_FILE;
   const ta=el('textarea',{readOnly:true,style:'display:none'});
-  const copy=()=>{const u=location.origin+location.pathname+'#c='+enc(cfg);if(u.length>15000){toast('Ссылка слишком длинная — скачай файл');return}ta.style.display='block';ta.value=u;ta.select();try{navigator.clipboard.writeText(u).then(()=>toast('Ссылка скопирована'),()=>{})}catch(e){}};
+  const copy=()=>{const u=LINK_BASE+'#c='+enc(cfg);if(u.length>15000){toast('Ссылка слишком длинная — скачай файл');return}ta.style.display='block';ta.value=u;ta.select();try{navigator.clipboard.writeText(u).then(()=>toast('Ссылка скопирована'),()=>{})}catch(e){}};
   const fileBtn=el('button',{className:long?'primary':'wide',textContent:'Скачать файл для OBS',on:{click:download}});
   const linkBtn=el('button',{className:long?'wide':'primary',textContent:'Скопировать ссылку для OBS',on:{click:copy}});
   pn.append(sec('Отправить в OBS',
     WARN(),
-    el('p',{className:'note'},long?(location.protocol==='file:'?'Ты открыла редактор из файла — сохраняй тоже файлом.':'Тебе подойдёт файл: ссылка получилась бы слишком длинной.'):'Проще всего ссылкой: её не надо хранить, обновления с сайта приходят сами.'),
+    el('p',{className:'note'},long?(FROM_FILE?'Ты открыла редактор из файла — сохраняй тоже файлом.':'Тебе подойдёт файл: ссылка получилась бы слишком длинной.'):'Проще всего ссылкой: её не надо хранить, обновления с сайта приходят сами.'),
     el('div',{className:'btns'},long?fileBtn:linkBtn),
-    el('div',{className:'btns'},long?(location.protocol==='file:'?null:linkBtn):fileBtn),ta,
+    el('div',{className:'btns'},long?(FROM_FILE?null:linkBtn):fileBtn),ta,
     more('Как добавить в OBS',
       el('p',{className:'note'},el('b',null,'Ссылкой: '),'Источники → «+» → Браузер → вставь ссылку в поле URL. Ширина 1920, высота 1080.'),
       el('p',{className:'note'},el('b',null,'Файлом: '),'то же, но поставь галочку «Локальный файл» и выбери файл. Храни его в постоянной папке.'),
