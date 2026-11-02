@@ -979,6 +979,7 @@ const WARN=()=>el('div',{className:'linkwarn',style:'display:none;background:#3a
 function buildPanel(){
   const pn=document.getElementById('panel');pn.innerHTML='';
   pn.append(el('h1',null,'Гирлянда'),el('p',{className:'sub'},'Виджет для OBS'));
+  if(location.protocol==='file:')pn.append(el('div',{style:'background:#1f2a3a;border:1px solid #4a6a9a;color:#cfe0ff;border-radius:8px;padding:8px 10px;margin:0 0 10px;font-size:12px'},'Это сохранённая копия редактора. Самая новая версия — на ',el('b',null,'sofaleya.github.io/garland'),': открой её, вкладка «Сохранить» → «Загрузить настройки из файла».'));
   pn.append(el('div',{className:'tabs'},...TABS.map(([k,l])=>el('button',{className:panelTab===k?'on':'',textContent:l,on:{click:()=>{panelTab=k;try{localStorage.setItem('garland-tab',k)}catch(e){}pn.scrollTop=0;buildPanel()}}}))));
   const T={shape:tabShape,hang:tabHang,weather:tabWeather,stream:tabStream,save:tabSave}[panelTab]||tabShape;
   T(pn);
@@ -1150,6 +1151,17 @@ function tabSave(pn){
   pn.append(sec('Фон превью',
     el('div',{className:'btns'},el('button',{textContent:'Ночь',on:{click:()=>setBg('bg-scene')}}),el('button',{textContent:'Прозрачный',on:{click:()=>setBg('bg-checker')}}),el('button',{textContent:'Светлый',on:{click:()=>setBg('bg-light')}}),el('button',{textContent:'Скрин стрима…',on:{click:()=>bgFile.click()}})),bgFile,
     el('p',{className:'note'},'Только для примерки, в OBS фона не будет.')
+  ));
+  const imp=el('input',{type:'file',accept:'.html,text/html',style:'display:none',on:{change:async e=>{
+    const f=e.target.files[0];e.target.value='';if(!f)return;
+    try{const txt=await f.text();const open='<scr'+'ipt id="cfg" type="application/json">';const i=txt.indexOf(open);if(i<0)throw 0;const j=txt.indexOf('</scr'+'ipt>',i);
+      const c=JSON.parse(txt.slice(i+open.length,j));if(!c||typeof c!=='object')throw 0;
+      if(c.fallAlpha!=null&&c.fallTransp==null)c.fallTransp=Math.max(0,Math.min(0.9,1-c.fallAlpha));
+      cfg=Object.assign(JSON.parse(JSON.stringify(DEFAULT)),c);loadImages();flakes=[];syncFlakes();syncEdge();build();save();heatConnect();rerender();toast('Настройки из файла загружены')}
+    catch(err){toast('В этом файле нет настроек гирлянды')}}}});
+  pn.append(sec('Открыть свой файл',
+    el('p',{className:'note'},'Сохранённый файл — это снимок редактора на день скачивания. Чтобы получить новые функции, загрузи его сюда: настройки подтянутся в свежую версию, потом скачай файл заново.'),
+    imp,el('div',{className:'btns'},el('button',{className:'wide',textContent:'📂 Загрузить настройки из файла',on:{click:()=>imp.click()}}))
   ));
   pn.append(more('Сбросить всё',el('div',{className:'btns'},el('button',{className:'wide danger',textContent:'Сбросить все настройки к начальным',on:{click:()=>{cfg=JSON.parse(JSON.stringify(DEFAULT));loadImages();flakes=[];syncFlakes();syncEdge();build();save();rerender()}}}))));
 }
