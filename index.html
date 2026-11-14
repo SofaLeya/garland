@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Гирлянда для OBS</title>
-<meta name="garland-version" content="2026-11-14.4">
+<meta name="garland-version" content="2026-11-14.5">
 <style>
 :root{--bg:#121018;--panel:#1b1822;--panel2:#24202d;--line:#332d3e;--text:#efeaf5;--muted:#9c94ab;--accent:#ffb347;--accent-ink:#2a1a05;--danger:#ff6b7d}
 *{box-sizing:border-box}
@@ -129,6 +129,10 @@ const PALETTES = {
   'Валентинка': ['#ff2d55','#ff7aa2','#ffc2d4','#ffffff'],
   'День рождения': ['#ff595e','#ffca3a','#8ac926','#1982c4','#6a4c93'],
   'Весна': ['#ff5e8a','#ffd23f','#ff9f1c','#fff3f7'],
+  '23 февраля': ['#d7263d','#ffd25a','#ffffff','#3c8d2f'],
+  'Масленица': ['#ffb703','#fb8500','#ffd166','#e63946'],
+  'Космос': ['#7b5cff','#00d1ff','#ff4fd8','#ffffff'],
+  'Хлопок': ['#f5efe6','#e8d5c4','#f2c6b4','#cfd8c8','#d9cbe8'],
 };
 const DEFAULT = {
   v:1,
@@ -137,7 +141,7 @@ const DEFAULT = {
   bulbGap:34, bulbSize:13,
   palette:PALETTES['Классика'].slice(),
   mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false, czEdison:true, czCat:true, czGhost:true, czDot:true, czBead:true, czLeaf:true, czEvery:10, nyBall:true, nyStar:true, nyCone:true, nyCandy:true, nyIcicle:true, nyDot:true,
-  wireColor:'#1a2a1e', wire:2.5,
+  wireColor:'#1a2a1e', wire:2.5, wireStyle:'plain', bulbShape:'classic',
   images:[], imgModes:[], imgSizes:[], imgPins:{}, imgCount:1, imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
   snow:140, flake:1, stick:true, fall:'snow', snowLook:'soft', leafLook:'mix', petalLook:'pinkred', fallTransp:0, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
   wind:0.3, gust:0.5, heatLogin:'', heatId:'', heatProvider:'heat', tugPower:1, clickRings:true,
@@ -565,17 +569,31 @@ const SETS={
   bd_mix:{g:'birthday',pat:['balloon','flag','flag','flag'],pal:'День рождения'},
   sp_tulips:{g:'spring',pat:['tulip','dot','tulip','dot'],pal:'Весна'},
   sp_chicks:{g:'spring',pat:['tulip','chick','tulip','dot'],pal:'Весна'},
+  d23_stars:{g:'d23',pat:['redstar','dot','dot'],pal:'23 февраля'},
+  d23_planes:{g:'d23',pat:['plane','dot','redstar','dot'],pal:'23 февраля'},
+  ms_suns:{g:'maslenitsa',pat:['sun','dot','dot'],pal:'Масленица'},
+  ms_pancakes:{g:'maslenitsa',pat:['pancake','dot','sun','dot'],pal:'Масленица'},
+  cs_space:{g:'cosmos',pat:['rocket','star','planet','star'],pal:'Космос'},
+  cs_planets:{g:'cosmos',pat:['planet','dot','dot'],pal:'Космос'},
+  nt_cotton:{g:'neutral',pat:['cotton'],pal:'Хлопок'},
+  nt_lanterns:{g:'neutral',pat:['lantern','dot'],pal:'Классика'},
+  nt_moon:{g:'neutral',pat:['moon','dot','star','dot'],pal:'Тёплый белый'},
+  nt_crystals:{g:'neutral',pat:['crystal','dot'],pal:'Холодный лёд'},
 };
 // [group, title, icon, variants [[style, title]]]
 const GROUPS=[
   ['classic','Классика','💡',[]],
+  ['neutral','Нейтральные','✨',[['nt_cotton','Хлопковые шарики'],['nt_lanterns','Бумажные фонарики'],['nt_moon','Луна и звёзды'],['nt_crystals','Хрустальные капли']]],
   ['cozy','Уютная','🐱',[]],
-  ['halloween','Хэллоуин','🎃',[['halloween','Все вперемешку'],['hw_skulls','Черепа и тыквы'],['hw_spooky','Черепа и летучие мыши'],['pumpkin','Тыквы'],['skull','Черепа'],['ghost','Привидения'],['bat','Летучие мыши'],['cat','Чёрные кошки'],['spider','Пауки']]],
   ['newyear','Новый год','🎄',[['newyear','Игрушки (выбрать галочками)'],['ny_mistletoe','Омела и большие звёзды'],['ny_stars','Большие звёзды'],['ny_frost','Снежинки и сосульки'],['ny_balls','Ёлочные шары']]],
-  ['easter','Пасха','🐣',[['ea_eggs','Крашеные яйца'],['ea_bunnies','Зайчики и цыплята'],['ea_tulips','Яйца и тюльпаны']]],
   ['valentine','14 февраля','💘',[['vl_hearts','Сердечки'],['vl_mix','Сердечки и тюльпаны']]],
-  ['birthday','День рождения','🎈',[['bd_flags','Флажки'],['bd_balloons','Воздушные шарики'],['bd_mix','Шарики и флажки']]],
+  ['d23','23 февраля','⭐',[['d23_stars','Красные звёзды'],['d23_planes','Самолётики и звёзды']]],
+  ['maslenitsa','Масленица','🥞',[['ms_suns','Солнышки'],['ms_pancakes','Блины и солнышки']]],
   ['spring','Весна, 8 марта','🌷',[['sp_tulips','Тюльпаны'],['sp_chicks','Тюльпаны и цыплята']]],
+  ['cosmos','День космонавтики','🚀',[['cs_space','Ракеты, планеты, звёзды'],['cs_planets','Планеты']]],
+  ['easter','Пасха','🐣',[['ea_eggs','Крашеные яйца'],['ea_bunnies','Зайчики и цыплята'],['ea_tulips','Яйца и тюльпаны']]],
+  ['halloween','Хэллоуин','🎃',[['halloween','Все вперемешку'],['hw_skulls','Черепа и тыквы'],['hw_spooky','Черепа и летучие мыши'],['pumpkin','Тыквы'],['skull','Черепа'],['ghost','Привидения'],['bat','Летучие мыши'],['cat','Чёрные кошки'],['spider','Пауки']]],
+  ['birthday','День рождения','🎈',[['bd_flags','Флажки'],['bd_balloons','Воздушные шарики'],['bd_mix','Шарики и флажки']]],
 ];
 function groupOf(st){if(SETS[st])return SETS[st].g;if(st==='halloween'||HALLOWEEN.includes(st))return 'halloween';return st}
 function isPendSlot(gi){const E=Math.max(3,cfg.czEvery|0);return cfg.style==='cozy'&&gi%E===Math.floor(E/2)}
@@ -847,6 +865,90 @@ function drawFlag(s,br,t,b,gc){
   ctx.beginPath();ctx.moveTo(-w,0);ctx.lineTo(w,0);ctx.lineTo(0,h);ctx.closePath();ctx.fill();
   ctx.fillStyle='rgba(255,255,255,.55)';for(const [x,y] of [[-0.45,0.15],[0.45,0.15],[0,0.2],[-0.2,0.42],[0.2,0.42],[0,0.65]]){ctx.beginPath();ctx.arc(x*w,y*h,s*0.035,0,6.283);ctx.fill()}
 }
+function drawRedStar(s,br,t,b){
+  ctx.rotate(Math.sin(t*1.1+b.ph)*0.12);thread(s*0.12);
+  const R=s*0.45,cy=s*0.12+R,ri=R*0.42;
+  ctx.beginPath();for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,rr=k%2?ri:R;ctx.lineTo(Math.cos(a)*rr,cy+Math.sin(a)*rr)}ctx.closePath();
+  const g=ctx.createRadialGradient(0,cy,0,0,cy,R);g.addColorStop(0,rgb(mix([255,110,120],WHITE,0.35*br)));g.addColorStop(1,rgb(mix([190,16,32],BLACK,0.25*(1-br))));
+  ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='#ffd25a';ctx.lineWidth=Math.max(0.7,s*0.04);ctx.stroke();
+}
+function drawPlane(s,br,t,b){
+  const sw=Math.sin(t*1.3+b.ph);ctx.rotate(sw*0.12);thread(s*0.3);
+  ctx.save();ctx.translate(0,s*0.42);ctx.rotate(sw*0.15);
+  const L=s*0.55,H=s*0.12;
+  ctx.fillStyle='#8fa6b8';ctx.beginPath();ctx.moveTo(-L*0.75,-H*0.2);ctx.lineTo(-L*0.98,-H*1.6);ctx.lineTo(-L*0.8,-H*1.6);ctx.lineTo(-L*0.45,-H*0.3);ctx.closePath();ctx.fill();
+  const g=ctx.createLinearGradient(0,-H,0,H);g.addColorStop(0,'#e3edf5');g.addColorStop(1,'#8fa6b8');ctx.fillStyle=g;
+  ctx.beginPath();ctx.ellipse(0,0,L,H,0,0,6.283);ctx.fill();
+  ctx.fillStyle='#6f8698';ctx.beginPath();ctx.moveTo(-L*0.15,0);ctx.lineTo(L*0.15,0);ctx.lineTo(-L*0.05,H*2.4);ctx.lineTo(-L*0.3,H*2.4);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#d7263d';ctx.beginPath();ctx.arc(-L*0.55,-H*0.05,H*0.35,0,6.283);ctx.fill();
+  ctx.fillStyle='#7fd3ff';for(const x of [0.15,0.35]){ctx.beginPath();ctx.arc(L*x,-H*0.25,H*0.28,0,6.283);ctx.fill()}
+  ctx.strokeStyle='rgba(60,60,70,.7)';ctx.lineWidth=Math.max(0.6,s*0.03);const pr=Math.abs(Math.sin(t*25));ctx.beginPath();ctx.moveTo(L*1.02,-H*1.6*pr);ctx.lineTo(L*1.02,H*1.6*pr);ctx.stroke();
+  ctx.restore();
+}
+function drawSun(s,br,t,b){
+  thread(s*0.1);const cy=s*0.55,r=s*0.28;
+  ctx.save();ctx.translate(0,cy);ctx.rotate(t*0.4+b.ph);ctx.fillStyle=`rgba(255,${170+40*br|0},40,${0.75+0.25*br})`;
+  for(let k=0;k<12;k++){ctx.rotate(Math.PI/6);ctx.beginPath();ctx.moveTo(-r*0.22,-r*1.05);ctx.lineTo(0,-r*1.6);ctx.lineTo(r*0.22,-r*1.05);ctx.closePath();ctx.fill()}ctx.restore();
+  const g=ctx.createRadialGradient(-r*0.3,cy-r*0.3,0,0,cy,r);g.addColorStop(0,'#fff3a0');g.addColorStop(1,'#ffb703');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,cy,r,0,6.283);ctx.fill();
+  ctx.fillStyle='#8a4b00';for(const sg of [-1,1]){ctx.beginPath();ctx.arc(sg*r*0.35,cy-r*0.15,r*0.09,0,6.283);ctx.fill()}
+  ctx.strokeStyle='#8a4b00';ctx.lineWidth=Math.max(0.6,s*0.025);ctx.beginPath();ctx.arc(0,cy+r*0.05,r*0.4,0.35,Math.PI-0.35);ctx.stroke();
+  ctx.fillStyle='rgba(255,110,80,.5)';for(const sg of [-1,1]){ctx.beginPath();ctx.ellipse(sg*r*0.6,cy+r*0.2,r*0.14,r*0.09,0,0,6.283);ctx.fill()}
+}
+function drawPancake(s,br,t,b){
+  ctx.rotate(Math.sin(t*1.0+b.ph)*0.1);thread(s*0.14);const cy=s*0.55,r=s*0.38;
+  const g=ctx.createRadialGradient(-r*0.2,cy-r*0.2,0,0,cy,r);g.addColorStop(0,'#f9d58a');g.addColorStop(0.75,'#eab05a');g.addColorStop(1,'#c47a2c');ctx.fillStyle=g;
+  ctx.beginPath();for(let k=0;k<=24;k++){const a=k/24*6.283,rr=r*(1+0.04*Math.sin(k*3.3+b.gi));ctx.lineTo(Math.cos(a)*rr,cy+Math.sin(a)*rr)}ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(170,95,30,.45)';for(let k=0;k<9;k++){const a=hash(b.gi*3+k)*6.283,d=hash(b.gi*7+k)*r*0.75;ctx.beginPath();ctx.arc(Math.cos(a)*d,cy+Math.sin(a)*d,r*(0.05+0.05*hash(k+b.gi)),0,6.283);ctx.fill()}
+  ctx.fillStyle='rgba(255,240,170,.85)';ctx.beginPath();ctx.ellipse(r*0.15,cy-r*0.1,r*0.2,r*0.13,0.3,0,6.283);ctx.fill();
+}
+function drawRocket(s,br,t,b){
+  ctx.rotate(Math.sin(t*1.1+b.ph)*0.08);thread(s*0.1);
+  const w=s*0.17,top=s*0.1,body=s*0.75;
+  ctx.fillStyle='#d7263d';for(const sg of [-1,1]){ctx.beginPath();ctx.moveTo(sg*w,top+body*0.7);ctx.lineTo(sg*w*2,top+body*1.02);ctx.lineTo(sg*w,top+body*0.95);ctx.closePath();ctx.fill()}
+  const g=ctx.createLinearGradient(-w,0,w,0);g.addColorStop(0,'#ffffff');g.addColorStop(1,'#b8c2cc');ctx.fillStyle=g;
+  ctx.beginPath();ctx.moveTo(0,top);ctx.quadraticCurveTo(w*1.4,top+body*0.3,w,top+body);ctx.lineTo(-w,top+body);ctx.quadraticCurveTo(-w*1.4,top+body*0.3,0,top);ctx.fill();
+  ctx.fillStyle='#d7263d';ctx.beginPath();ctx.moveTo(0,top);ctx.quadraticCurveTo(w*0.9,top+body*0.12,w*0.95,top+body*0.22);ctx.lineTo(-w*0.95,top+body*0.22);ctx.quadraticCurveTo(-w*0.9,top+body*0.12,0,top);ctx.fill();
+  ctx.fillStyle='#2e86de';ctx.strokeStyle='#8a96a3';ctx.lineWidth=Math.max(0.6,s*0.025);ctx.beginPath();ctx.arc(0,top+body*0.45,w*0.45,0,6.283);ctx.fill();ctx.stroke();
+  const fl=0.7+0.3*Math.sin(t*20+b.ph);const fg=ctx.createLinearGradient(0,top+body,0,top+body+s*0.4*fl);fg.addColorStop(0,'rgba(255,240,160,1)');fg.addColorStop(0.5,'rgba(255,140,40,.9)');fg.addColorStop(1,'rgba(255,60,20,0)');
+  ctx.fillStyle=fg;ctx.beginPath();ctx.moveTo(-w*0.7,top+body);ctx.quadraticCurveTo(0,top+body+s*0.55*fl,w*0.7,top+body);ctx.fill();
+}
+function drawPlanet(s,br,t,b,gc){
+  gc=gc||[123,92,255];ctx.rotate(Math.sin(t*0.9+b.ph)*0.08);thread(s*0.14);const cy=s*0.55,r=s*0.3,tilt=-0.35;
+  const ring=(a0,a1)=>{ctx.strokeStyle=rgb(mix(gc,WHITE,0.55),0.85);ctx.lineWidth=Math.max(0.8,s*0.05);ctx.beginPath();ctx.ellipse(0,cy,r*1.65,r*0.42,tilt,a0,a1);ctx.stroke()};
+  ring(Math.PI,2*Math.PI);
+  const g=ctx.createRadialGradient(-r*0.35,cy-r*0.35,0,0,cy,r);g.addColorStop(0,rgb(mix(gc,WHITE,0.45+0.3*br)));g.addColorStop(1,rgb(mix(gc,BLACK,0.35)));ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,cy,r,0,6.283);ctx.fill();
+  ctx.strokeStyle=rgb(mix(gc,BLACK,0.2),0.4);ctx.lineWidth=Math.max(0.5,s*0.03);ctx.beginPath();ctx.ellipse(0,cy-r*0.3,r*0.85,r*0.12,0,0,6.283);ctx.stroke();
+  ring(0,Math.PI);
+}
+function drawCotton(s,br,t,b,gc){
+  gc=gc||[245,239,230];thread(s*0.08);const cy=s*0.5,r=s*0.36;
+  const inner=mix(gc,[255,214,150],0.25*br);
+  const g=ctx.createRadialGradient(0,cy,0,0,cy,r*1.15);g.addColorStop(0,rgb(mix(inner,WHITE,0.35+0.5*br)));g.addColorStop(0.7,rgb(mix(gc,WHITE,0.1*br)));g.addColorStop(1,rgb(mix(gc,BLACK,0.18)));ctx.fillStyle=g;
+  ctx.beginPath();for(let k=0;k<=30;k++){const a=k/30*6.283,rr=r*(1+0.06*Math.sin(k*5.7+b.gi)+0.04*Math.sin(k*11.3));ctx.lineTo(Math.cos(a)*rr,cy+Math.sin(a)*rr)}ctx.closePath();ctx.fill();
+  ctx.strokeStyle=rgb(mix(gc,BLACK,0.12),0.35);ctx.lineWidth=Math.max(0.4,s*0.015);ctx.beginPath();for(let k=0;k<7;k++){const a=hash(b.gi+k)*6.283,d=r*0.5;ctx.moveTo(Math.cos(a)*d*0.3,cy+Math.sin(a)*d*0.3);ctx.quadraticCurveTo(Math.cos(a+0.5)*d,cy+Math.sin(a+0.5)*d,Math.cos(a)*r*0.9,cy+Math.sin(a)*r*0.9)}ctx.stroke();
+}
+function drawLantern(s,br,t,b,gc){
+  gc=gc||[255,48,48];ctx.rotate(Math.sin(t*1.1+b.ph)*0.1);thread(s*0.1);const cy=s*0.55,rx=s*0.32,ry=s*0.3;
+  const g=ctx.createRadialGradient(0,cy,0,0,cy,rx*1.2);g.addColorStop(0,rgb(mix(gc,[255,230,150],0.4+0.4*br)));g.addColorStop(1,rgb(mix(gc,BLACK,0.3*(1-br)+0.1)));ctx.fillStyle=g;
+  ctx.beginPath();ctx.ellipse(0,cy,rx,ry,0,0,6.283);ctx.fill();
+  ctx.strokeStyle=rgb(mix(gc,BLACK,0.4),0.5);ctx.lineWidth=Math.max(0.5,s*0.02);ctx.beginPath();for(const k of [-0.6,-0.2,0.2,0.6]){ctx.ellipse(0,cy,rx*Math.sqrt(1-k*k),ry,0,0,6.283)}ctx.stroke();
+  ctx.fillStyle='#b8862a';ctx.fillRect(-rx*0.45,cy-ry-s*0.06,rx*0.9,s*0.08);ctx.fillRect(-rx*0.45,cy+ry-s*0.02,rx*0.9,s*0.08);
+  ctx.strokeStyle=rgb(mix(gc,BLACK,0.1));ctx.lineWidth=Math.max(0.6,s*0.025);ctx.beginPath();for(const x of [-0.1,0,0.1]){ctx.moveTo(x*rx,cy+ry+s*0.06);ctx.lineTo(x*rx*1.5,cy+ry+s*0.3)}ctx.stroke();
+}
+function drawMoon(s,br,t,b){
+  ctx.rotate(Math.sin(t*0.9+b.ph)*0.1);thread(s*0.12);const cy=s*0.55,r=s*0.38;
+  ctx.beginPath();ctx.arc(0,cy,r,Math.PI*0.35,Math.PI*1.65,false);ctx.arc(r*0.45,cy-r*0.05,r*0.82,Math.PI*1.45,Math.PI*0.52,true);ctx.closePath();
+  const g=ctx.createRadialGradient(-r*0.5,cy,0,-r*0.3,cy,r*1.1);g.addColorStop(0,rgb(mix([255,240,190],WHITE,0.3*br)));g.addColorStop(1,'#e8b84a');ctx.fillStyle=g;ctx.fill();
+  ctx.fillStyle='rgba(190,140,40,.35)';ctx.beginPath();ctx.arc(-r*0.6,cy+r*0.2,r*0.09,0,6.283);ctx.arc(-r*0.45,cy-r*0.4,r*0.06,0,6.283);ctx.fill();
+}
+function drawCrystal(s,br,t,b){
+  ctx.rotate(Math.sin(t*1.2+b.ph)*0.15);thread(s*0.12);const top=s*0.12,w=s*0.24,h=s*1.0;
+  const pts=[[0,top],[w,top+h*0.3],[0,top+h],[-w,top+h*0.3]];
+  ctx.beginPath();pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();
+  const g=ctx.createLinearGradient(-w,top,w,top+h);g.addColorStop(0,`rgba(235,248,255,${0.7+0.25*br})`);g.addColorStop(0.5,'rgba(150,200,255,.45)');g.addColorStop(1,`rgba(220,240,255,${0.6+0.3*br})`);ctx.fillStyle=g;ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=Math.max(0.5,s*0.02);ctx.stroke();ctx.beginPath();ctx.moveTo(-w,top+h*0.3);ctx.lineTo(w,top+h*0.3);ctx.moveTo(0,top);ctx.lineTo(0,top+h);ctx.moveTo(-w*0.5,top+h*0.3);ctx.lineTo(0,top+h);ctx.lineTo(w*0.5,top+h*0.3);ctx.stroke();
+  const gl=0.5+0.5*Math.sin(t*3+b.ph*2);ctx.fillStyle=`rgba(255,255,255,${0.4*gl+0.4*br})`;ctx.beginPath();ctx.arc(-w*0.35,top+h*0.25,s*0.035,0,6.283);ctx.fill();
+}
 /* ---------- new year style ---------- */
 function drawBall(s,br,t,b,gc){
   gc=gc||[232,40,58];
@@ -924,6 +1026,16 @@ const FIG={
   heart:{sz:1.0,len:0.55,gr:1.9,ga:0.55,glow:null,draw:drawHeart},
   balloon:{sz:1.3,len:0.8,gr:0,ga:0,glow:'#000000',draw:drawBalloon},
   flag:{sz:1.0,len:0.45,gr:0,ga:0,glow:'#000000',draw:drawFlag},
+  redstar:{sz:1.3,len:0.57,gr:2.0,ga:0.8,glow:'#ff3b4a',draw:drawRedStar},
+  plane:{sz:1.7,len:0.45,gr:0,ga:0,glow:'#000000',draw:drawPlane},
+  sun:{sz:1.3,len:0.55,gr:2.2,ga:0.8,glow:'#ffc233',draw:drawSun},
+  pancake:{sz:1.1,len:0.55,gr:0,ga:0,glow:'#000000',draw:drawPancake},
+  rocket:{sz:1.5,len:0.6,gr:1.2,ga:0.6,glow:'#ff9a3c',draw:drawRocket},
+  planet:{sz:1.2,len:0.55,gr:1.6,ga:0.45,glow:null,draw:drawPlanet},
+  cotton:{sz:1.0,len:0.5,gr:2.0,ga:0.45,glow:null,draw:drawCotton},
+  lantern:{sz:1.1,len:0.55,gr:2.1,ga:0.6,glow:null,draw:drawLantern},
+  moon:{sz:1.5,len:0.55,gr:2.0,ga:0.6,glow:'#ffe6a0',draw:drawMoon},
+  crystal:{sz:1.1,len:0.6,gr:1.5,ga:0.5,glow:'#cfeaff',draw:drawCrystal},
 };
 
 /* ---------- render ---------- */
@@ -949,6 +1061,39 @@ function bulbPath(s){
   ctx.beginPath();ctx.moveTo(-rx*0.55,s*0.42);
   ctx.bezierCurveTo(-rx*1.3,s*0.72,-rx*0.95,cy+ry*0.7,0,cy+ry);
   ctx.bezierCurveTo(rx*0.95,cy+ry*0.7,rx*1.3,s*0.72,rx*0.55,s*0.42);ctx.closePath();
+}
+const BULB_SHAPES=[['classic','Груша (классика)'],['round','Шарик'],['flame','Свеча-пламя'],['c9','Ретро-конус'],['drop','Капля'],['mini','Рисинка (мелкие)'],['lantern','Бочонок'],['starlamp','Звёздочка']];
+function bulbShapePath(s){
+  const k=cfg.bulbShape||'classic';ctx.beginPath();
+  if(k==='round'){ctx.arc(0,s*0.98,s*0.5,0,6.283)}
+  else if(k==='flame'){ctx.moveTo(-s*0.2,s*0.42);ctx.bezierCurveTo(-s*0.48,s*0.85,-s*0.22,s*1.3,0,s*1.78);ctx.bezierCurveTo(s*0.22,s*1.3,s*0.48,s*0.85,s*0.2,s*0.42);ctx.closePath()}
+  else if(k==='c9'){ctx.moveTo(-s*0.3,s*0.42);ctx.quadraticCurveTo(-s*0.42,s*1.0,0,s*1.65);ctx.quadraticCurveTo(s*0.42,s*1.0,s*0.3,s*0.42);ctx.closePath()}
+  else if(k==='drop'){ctx.moveTo(-s*0.12,s*0.42);ctx.bezierCurveTo(-s*0.58,s*0.95,-s*0.52,s*1.62,0,s*1.62);ctx.bezierCurveTo(s*0.52,s*1.62,s*0.58,s*0.95,s*0.12,s*0.42);ctx.closePath()}
+  else if(k==='mini'){ctx.ellipse(0,s*0.8,s*0.17,s*0.36,0,0,6.283)}
+  else if(k==='lantern'){ctx.roundRect(-s*0.36,s*0.42,s*0.72,s*1.05,s*0.3)}
+  else if(k==='starlamp'){const R=s*0.58,cy=s*1.05;for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,rr=i%2?R*0.45:R;ctx.lineTo(Math.cos(a)*rr,cy+Math.sin(a)*rr)}ctx.closePath()}
+  else{const rx=s*0.36,cy=s*1.0,ry=s*0.58;ctx.moveTo(-rx*0.55,s*0.42);ctx.bezierCurveTo(-rx*1.3,s*0.72,-rx*0.95,cy+ry*0.7,0,cy+ry);ctx.bezierCurveTo(rx*0.95,cy+ry*0.7,rx*1.3,s*0.72,rx*0.55,s*0.42);ctx.closePath()}
+}
+/* ---------- wire looks ---------- */
+const WIRE_STYLES=[['plain','Обычный провод'],['twist','Витой (две жилы)'],['liana','Лиана'],['rope','Верёвка'],['beads','Бусины'],['snake','Змейка (волной)'],['tinsel','Мишура'],['none','Невидимый (лампочки в воздухе)']];
+function wireStrip(P){
+  const D=[];for(let i=0;i<P.length-1;i++){const a=P[i],b=P[i+1];for(let k=0;k<3;k++){const u=k/3;D.push([a.x+(b.x-a.x)*u,a.y+(b.y-a.y)*u])}}const l=P[P.length-1];D.push([l.x,l.y]);
+  const R=[];let arc=0;for(let i=0;i<D.length;i++){if(i)arc+=Math.hypot(D[i][0]-D[i-1][0],D[i][1]-D[i-1][1]);const a=D[Math.max(0,i-1)],b=D[Math.min(D.length-1,i+1)];let tx=b[0]-a[0],ty=b[1]-a[1];const L=Math.hypot(tx,ty)||1;tx/=L;ty/=L;R.push({x:D[i][0],y:D[i][1],nx:-ty,ny:tx,tx,ty,s:arc})}
+  return R;
+}
+function strokeOff(R,f){ctx.beginPath();R.forEach((p,i)=>{const o=f(p.s);const x=p.x+p.nx*o,y=p.y+p.ny*o;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()}
+function drawWire(ch,wc,t){
+  const st=cfg.wireStyle||'plain',W=cfg.wire,col=cfg.wireColor,hi=rgb(mix(wc,WHITE,0.35),0.35),dk=rgb(mix(wc,BLACK,0.35)),lt=rgb(mix(wc,WHITE,0.25));
+  if(st==='none')return;
+  if(st==='plain'){wirePath(ch.P);ctx.strokeStyle=col;ctx.lineWidth=W;ctx.stroke();ctx.strokeStyle=hi;ctx.lineWidth=Math.max(0.6,W*0.3);ctx.stroke();return}
+  const R=wireStrip(ch.P);
+  if(st==='twist'){const per=W*5+4,f=s=>Math.sin(s/per*6.283)*W*0.45;ctx.lineWidth=Math.max(0.8,W*0.75);ctx.strokeStyle=dk;strokeOff(R,f);ctx.strokeStyle=col;strokeOff(R,s=>-f(s));ctx.strokeStyle=hi;ctx.lineWidth=Math.max(0.5,W*0.25);strokeOff(R,s=>-f(s));return}
+  if(st==='liana'){ctx.strokeStyle=col;ctx.lineWidth=W*1.6;strokeOff(R,()=>0);ctx.strokeStyle=dk;ctx.lineWidth=Math.max(0.7,W*0.6);strokeOff(R,s=>Math.sin(s/(W*14+10)*6.283)*W*0.9);ctx.strokeStyle=lt;ctx.lineWidth=Math.max(0.5,W*0.35);strokeOff(R,s=>Math.cos(s/(W*9+7)*6.283)*W*0.6);return}
+  if(st==='rope'){ctx.strokeStyle=col;ctx.lineWidth=W*1.8;strokeOff(R,()=>0);ctx.strokeStyle=dk;ctx.lineWidth=Math.max(0.5,W*0.28);ctx.beginPath();let next=0;for(const p of R){if(p.s<next)continue;next=p.s+W*1.1+1;const a=W*0.85,c=W*0.55;ctx.moveTo(p.x+p.nx*a-p.tx*c,p.y+p.ny*a-p.ty*c);ctx.lineTo(p.x-p.nx*a+p.tx*c,p.y-p.ny*a+p.ty*c)}ctx.stroke();return}
+  if(st==='beads'){ctx.strokeStyle=col;ctx.lineWidth=Math.max(0.6,W*0.3);strokeOff(R,()=>0);let next=0;const r=W*0.9+0.5;for(const p of R){if(p.s<next)continue;next=p.s+r*2.6;const g=ctx.createRadialGradient(p.x-r*0.3,p.y-r*0.3,0,p.x,p.y,r);g.addColorStop(0,rgb(mix(wc,WHITE,0.55)));g.addColorStop(1,col);ctx.fillStyle=g;ctx.beginPath();ctx.arc(p.x,p.y,r,0,6.283);ctx.fill()}return}
+  if(st==='snake'){const f=s=>Math.sin(s/(W*6+14)*6.283)*(W*1.1+2);ctx.strokeStyle=col;ctx.lineWidth=W;strokeOff(R,f);ctx.strokeStyle=hi;ctx.lineWidth=Math.max(0.6,W*0.3);strokeOff(R,f);return}
+  if(st==='tinsel'){ctx.strokeStyle=col;ctx.lineWidth=Math.max(0.6,W*0.4);strokeOff(R,()=>0);ctx.lineWidth=Math.max(0.5,W*0.22);let i=0;
+    for(const p of R){i++;if(i%2)continue;const h=hash(i*1.37),a=h*6.283,L=W*(1.8+2.2*hash(i*2.11))+3;const sp=0.5+0.5*Math.sin(t*3+h*20);ctx.strokeStyle=h>0.5?rgb(mix(wc,WHITE,0.2+0.6*sp)):col;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(p.x+Math.cos(a)*L,p.y+Math.sin(a)*L);ctx.stroke()}return}
 }
 function wirePath(P){
   ctx.beginPath();ctx.moveTo(P[0].x,P[0].y);
@@ -983,8 +1128,7 @@ function render(){
   const wc=hex2rgb(cfg.wireColor);
   ctx.lineCap='round';ctx.lineJoin='round';
   for(const ch of chains){
-    wirePath(ch.P);ctx.strokeStyle=cfg.wireColor;ctx.lineWidth=cfg.wire;ctx.stroke();
-    ctx.strokeStyle=rgb(mix(wc,WHITE,0.35),0.35);ctx.lineWidth=Math.max(0.6,cfg.wire*0.3);ctx.stroke();
+    drawWire(ch,wc,t);
   }
   if(cfg.vine)chains.forEach(drawVine);
   // bulbs
@@ -1004,7 +1148,7 @@ function render(){
     }
     let col=hex2rgb(o.c1);if(o.c2)col=mix(col,hex2rgb(o.c2),o.f);
     const br=o.br;
-    bulbPath(s);
+    bulbShapePath(s);
     const g=ctx.createRadialGradient(-s*0.12,s*0.85,0,0,s*1.05,s*0.75);
     g.addColorStop(0,rgb(mix(col,WHITE,0.1+0.6*br)));
     g.addColorStop(0.5,rgb(mix(col,BLACK,0.45*(1-br))));
@@ -1264,6 +1408,7 @@ function tabHang(pn){
   const G=GROUPS.find(g=>g[0]===grp);
   pn.append(sec('Стиль',
     cards(GROUPS.map(g=>[g[0],g[1],g[2]]),k=>grp===k,k=>{const g=GROUPS.find(x=>x[0]===k);pickStyle(g[3].length?g[3][0][0]:k)}),
+    grp==='classic'?selectRow('Форма лампочек','bulbShape',BULB_SHAPES,false):null,
     G&&G[3].length>1?el('div',{className:'row'},el('label',null,el('span',null,'Вариант')),el('select',{on:{change:e=>pickStyle(e.target.value)}},...G[3].map(([v,l])=>el('option',{value:v,selected:v===st},l)))):null,
     el('div',{className:'btns'},el('button',{className:'wide',textContent:'✦ Готовый набор «Уютная осень»',on:{click:applyCozy}})),
     el('div',{className:'btns'},el('button',{className:'wide',textContent:'✦ Готовый набор «Новый год»',on:{click:applyNewYear}}))
@@ -1293,9 +1438,10 @@ function tabHang(pn){
   ));
   const wcol=el('input',{type:'color',value:cfg.wireColor,on:{input:e=>{cfg.wireColor=e.target.value;changed(false)}}});
   pn.append(sec('Провод',
+    selectRow('Вид провода','wireStyle',WIRE_STYLES,false),
     el('div',{className:'row'},el('label',null,el('span',null,'Цвет'),wcol)),
     slider('Толщина','wire',1,8,0.5,v=>v),
-    check('Зелёная лоза','vine')
+    check('Листики на проводе','vine')
   ));
   pn.append(secImages());
 }
