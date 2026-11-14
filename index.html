@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Гирлянда для OBS</title>
-<meta name="garland-version" content="2026-11-14.3">
+<meta name="garland-version" content="2026-11-14.4">
 <style>
 :root{--bg:#121018;--panel:#1b1822;--panel2:#24202d;--line:#332d3e;--text:#efeaf5;--muted:#9c94ab;--accent:#ffb347;--accent-ink:#2a1a05;--danger:#ff6b7d}
 *{box-sizing:border-box}
@@ -53,7 +53,7 @@ textarea{width:100%;height:70px;background:#0e0c12;color:var(--text);border:1px 
 #frame.bg-light{background:linear-gradient(#dfe6ef,#c4cfdc)}
 #frame #cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
 .tabs{position:sticky;top:-18px;z-index:5;display:flex;gap:4px;background:var(--panel);padding:8px 0 10px;margin:0 0 6px;border-bottom:1px solid var(--line)}
-.tabs button{flex:1;padding:7px 2px;font-size:12px;border-radius:8px}
+.tabs button{flex:1 1 auto;min-width:0;padding:7px 1px;font-size:11px;border-radius:8px;letter-spacing:-.01em}
 .tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 12px}
 .card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 4px;font-size:11.5px;line-height:1.2;text-align:center}
@@ -125,6 +125,10 @@ const PALETTES = {
   'Неон': ['#ff00e6','#00f0ff','#7cff00','#ffea00'],
   'Хэллоуин': ['#ff7a00','#9b4dff','#5dff3a'],
   'Новый год': ['#e8283a','#ffd25a','#2fbf71','#4aa3ff','#f4f4f4'],
+  'Пасха': ['#ffb3d1','#a8e6bf','#ffe08a','#a9cdff','#d9c2ff'],
+  'Валентинка': ['#ff2d55','#ff7aa2','#ffc2d4','#ffffff'],
+  'День рождения': ['#ff595e','#ffca3a','#8ac926','#1982c4','#6a4c93'],
+  'Весна': ['#ff5e8a','#ffd23f','#ff9f1c','#fff3f7'],
 };
 const DEFAULT = {
   v:1,
@@ -542,10 +546,42 @@ function updateFlakes(t){
 }
 
 /* ---------- halloween figures ---------- */
-const HALLOWEEN=['pumpkin','ghost','bat','cat','spider'];
+const HALLOWEEN=['pumpkin','ghost','bat','cat','spider','skull'];
+// holiday garlands: style key -> group, repeating pattern of figures, suggested palette
+const SETS={
+  hw_skulls:{g:'halloween',pat:['skull','dot','pumpkin','dot'],pal:'Хэллоуин'},
+  hw_spooky:{g:'halloween',pat:['bat','skull','bat','spider'],pal:'Хэллоуин'},
+  ny_mistletoe:{g:'newyear',pat:['bigstar','dot','dot','mistletoe','dot','dot'],pal:'Рубин и золото'},
+  ny_stars:{g:'newyear',pat:['bigstar','dot','dot','dot'],pal:'Тёплый белый'},
+  ny_frost:{g:'newyear',pat:['snowflake','dot','icicle','dot'],pal:'Холодный лёд'},
+  ny_balls:{g:'newyear',pat:['ball','ball','dot'],pal:'Новый год'},
+  ea_eggs:{g:'easter',pat:['egg','dot','egg','dot'],pal:'Пасха'},
+  ea_bunnies:{g:'easter',pat:['bunny','egg','chick','egg'],pal:'Пасха'},
+  ea_tulips:{g:'easter',pat:['egg','tulip','egg','dot'],pal:'Пасха'},
+  vl_hearts:{g:'valentine',pat:['heart','dot','heart','dot'],pal:'Валентинка'},
+  vl_mix:{g:'valentine',pat:['heart','tulip','heart','dot'],pal:'Валентинка'},
+  bd_flags:{g:'birthday',pat:['flag'],pal:'День рождения'},
+  bd_balloons:{g:'birthday',pat:['balloon','dot','dot'],pal:'День рождения'},
+  bd_mix:{g:'birthday',pat:['balloon','flag','flag','flag'],pal:'День рождения'},
+  sp_tulips:{g:'spring',pat:['tulip','dot','tulip','dot'],pal:'Весна'},
+  sp_chicks:{g:'spring',pat:['tulip','chick','tulip','dot'],pal:'Весна'},
+};
+// [group, title, icon, variants [[style, title]]]
+const GROUPS=[
+  ['classic','Классика','💡',[]],
+  ['cozy','Уютная','🐱',[]],
+  ['halloween','Хэллоуин','🎃',[['halloween','Все вперемешку'],['hw_skulls','Черепа и тыквы'],['hw_spooky','Черепа и летучие мыши'],['pumpkin','Тыквы'],['skull','Черепа'],['ghost','Привидения'],['bat','Летучие мыши'],['cat','Чёрные кошки'],['spider','Пауки']]],
+  ['newyear','Новый год','🎄',[['newyear','Игрушки (выбрать галочками)'],['ny_mistletoe','Омела и большие звёзды'],['ny_stars','Большие звёзды'],['ny_frost','Снежинки и сосульки'],['ny_balls','Ёлочные шары']]],
+  ['easter','Пасха','🐣',[['ea_eggs','Крашеные яйца'],['ea_bunnies','Зайчики и цыплята'],['ea_tulips','Яйца и тюльпаны']]],
+  ['valentine','14 февраля','💘',[['vl_hearts','Сердечки'],['vl_mix','Сердечки и тюльпаны']]],
+  ['birthday','День рождения','🎈',[['bd_flags','Флажки'],['bd_balloons','Воздушные шарики'],['bd_mix','Шарики и флажки']]],
+  ['spring','Весна, 8 марта','🌷',[['sp_tulips','Тюльпаны'],['sp_chicks','Тюльпаны и цыплята']]],
+];
+function groupOf(st){if(SETS[st])return SETS[st].g;if(st==='halloween'||HALLOWEEN.includes(st))return 'halloween';return st}
 function isPendSlot(gi){const E=Math.max(3,cfg.czEvery|0);return cfg.style==='cozy'&&gi%E===Math.floor(E/2)}
 function figureOf(gi){
   const st=cfg.style;
+  if(SETS[st]){const p=SETS[st].pat;return p[gi%p.length]}
   if(st==='halloween')return HALLOWEEN[gi%HALLOWEEN.length];
   if(st==='newyear'){let pat=['ball','dot','star','dot','cone','dot','ball','dot','candy','dot','icicle','dot'].filter(k=>cfg['ny'+k[0].toUpperCase()+k.slice(1)]);if(!pat.length)pat=['ball'];return pat[gi%pat.length]}
   if(HALLOWEEN.includes(st))return st;
@@ -708,6 +744,109 @@ function drawSpider(s,br,t,b,gc,Lfix){
   ctx.fillStyle=`rgba(255,${40+60*br|0},40,${0.5+0.5*br})`;
   ctx.beginPath();ctx.arc(-s*0.045,hy+s*0.03,s*0.025,0,6.283);ctx.arc(s*0.045,hy+s*0.03,s*0.025,0,6.283);ctx.fill();
 }
+/* ---------- holiday figures ---------- */
+function thread(L){ctx.strokeStyle='rgba(210,210,220,.6)';ctx.lineWidth=Math.max(0.6,L*0.12);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,L);ctx.stroke()}
+function drawSkull(s,br,t,b,gc){
+  gc=gc||[255,122,10];ctx.rotate(Math.sin(t*1.1+b.ph)*0.1);thread(s*0.14);
+  const cy=s*0.5,r=s*0.33;
+  const g=ctx.createRadialGradient(-r*0.3,cy-r*0.4,0,0,cy,r*1.3);g.addColorStop(0,'#fbf8ee');g.addColorStop(1,'#c9bfa6');ctx.fillStyle=g;
+  ctx.beginPath();ctx.ellipse(0,cy,r,r*0.92,0,0,6.283);ctx.fill();
+  ctx.beginPath();ctx.roundRect(-r*0.55,cy+r*0.5,r*1.1,r*0.6,r*0.18);ctx.fill();
+  ctx.fillStyle='#1a1220';for(const sg of [-1,1]){ctx.beginPath();ctx.ellipse(sg*r*0.4,cy+r*0.12,r*0.25,r*0.29,sg*0.2,0,6.283);ctx.fill()}
+  ctx.fillStyle=rgb(mix(gc,WHITE,0.3),0.25+0.75*br);for(const sg of [-1,1]){ctx.beginPath();ctx.arc(sg*r*0.4,cy+r*0.15,r*0.1,0,6.283);ctx.fill()}
+  ctx.fillStyle='#1a1220';ctx.beginPath();ctx.moveTo(0,cy+r*0.35);ctx.lineTo(-r*0.1,cy+r*0.55);ctx.lineTo(r*0.1,cy+r*0.55);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(60,45,40,.6)';ctx.lineWidth=Math.max(0.5,s*0.02);ctx.beginPath();for(let k=-2;k<=2;k++){ctx.moveTo(k*r*0.18,cy+r*0.72);ctx.lineTo(k*r*0.18,cy+r*1.05)}ctx.stroke();
+}
+function drawMistletoe(s,br,t,b){
+  ctx.rotate(Math.sin(t*1.0+b.ph)*0.1);
+  ctx.strokeStyle='#5c7a2e';ctx.lineWidth=Math.max(0.8,s*0.03);ctx.beginPath();ctx.moveTo(0,s*0.12);ctx.lineTo(0,s*0.42);ctx.stroke();
+  const leaf=(x,y,a,w,h)=>{ctx.save();ctx.translate(x,y);ctx.rotate(a);const g=ctx.createLinearGradient(-w,0,w,0);g.addColorStop(0,'#5f9a3c');g.addColorStop(1,'#2f5e25');ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(0,0,w,h,0,0,6.283);ctx.fill();ctx.strokeStyle='rgba(20,50,15,.5)';ctx.lineWidth=Math.max(0.4,s*0.012);ctx.beginPath();ctx.moveTo(-w*0.8,0);ctx.lineTo(w*0.8,0);ctx.stroke();ctx.restore()};
+  leaf(-s*0.2,s*0.42,0.5,s*0.2,s*0.075);leaf(s*0.2,s*0.42,-0.5,s*0.2,s*0.075);leaf(-s*0.12,s*0.55,1.1,s*0.15,s*0.06);leaf(s*0.12,s*0.55,-1.1,s*0.15,s*0.06);
+  for(const [x,y] of [[-s*0.05,s*0.4],[s*0.06,s*0.42],[0,s*0.5]]){const g=ctx.createRadialGradient(x-s*0.02,y-s*0.02,0,x,y,s*0.06);g.addColorStop(0,'#ffffff');g.addColorStop(1,'#dcd6c4');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,s*0.055,0,6.283);ctx.fill()}
+  ctx.fillStyle='#d61f35';
+  for(const sg of [-1,1]){ctx.beginPath();ctx.moveTo(0,s*0.12);ctx.quadraticCurveTo(sg*s*0.2,-s*0.02,sg*s*0.2,s*0.12);ctx.quadraticCurveTo(sg*s*0.16,s*0.2,0,s*0.12);ctx.fill();
+    ctx.beginPath();ctx.moveTo(0,s*0.13);ctx.lineTo(sg*s*0.1,s*0.3);ctx.lineTo(sg*s*0.05,s*0.28);ctx.lineTo(sg*s*0.02,s*0.32);ctx.closePath();ctx.fill()}
+  ctx.beginPath();ctx.arc(0,s*0.12,s*0.04,0,6.283);ctx.fill();
+}
+function drawSnowPend(s,br,t,b){
+  thread(s*0.12);const cy=s*0.55,R=s*0.42;
+  ctx.save();ctx.translate(0,cy);ctx.rotate(t*0.3+b.ph);
+  ctx.strokeStyle=`rgba(225,242,255,${0.75+0.25*br})`;ctx.lineCap='round';ctx.lineWidth=Math.max(0.8,s*0.055);
+  ctx.beginPath();for(let k=0;k<6;k++){const a=k*Math.PI/3,c=Math.cos(a),n=Math.sin(a);ctx.moveTo(0,0);ctx.lineTo(c*R,n*R);
+    for(const f of [0.5,0.75]){const bx=c*R*f,by=n*R*f,l=R*0.22;for(const sg of [-1,1]){const aa=a+sg*0.7;ctx.moveTo(bx,by);ctx.lineTo(bx+Math.cos(aa)*l,by+Math.sin(aa)*l)}}}
+  ctx.stroke();ctx.fillStyle='#eef8ff';ctx.beginPath();ctx.arc(0,0,R*0.12,0,6.283);ctx.fill();ctx.restore();
+}
+function drawEgg(s,br,t,b,gc){
+  gc=gc||[255,179,209];ctx.rotate(Math.sin(t*1.1+b.ph)*0.08);thread(s*0.16);
+  const cy=s*0.6,rx=s*0.3,ry=s*0.42;
+  const path=()=>{ctx.beginPath();ctx.moveTo(0,cy-ry);ctx.bezierCurveTo(rx*0.85,cy-ry,rx*1.3,cy+ry*0.95,0,cy+ry);ctx.bezierCurveTo(-rx*1.3,cy+ry*0.95,-rx*0.85,cy-ry,0,cy-ry)};
+  const g=ctx.createRadialGradient(-rx*0.3,cy-ry*0.35,0,0,cy,ry*1.1);g.addColorStop(0,rgb(mix(gc,WHITE,0.5)));g.addColorStop(1,rgb(mix(gc,BLACK,0.2)));
+  path();ctx.fillStyle=g;ctx.fill();
+  ctx.save();path();ctx.clip();
+  const kind=b.gi%3,w=rgb(mix(gc,WHITE,0.85)),d=rgb(mix(gc,BLACK,0.35));
+  ctx.strokeStyle=w;ctx.lineWidth=Math.max(0.8,s*0.045);ctx.beginPath();
+  if(kind===0){for(let k=-4;k<=4;k++){const x=k*rx*0.3;ctx.lineTo(x,cy+(k%2?-1:1)*ry*0.12)}}
+  else if(kind===1){ctx.moveTo(-rx*1.3,cy-ry*0.25);ctx.lineTo(rx*1.3,cy-ry*0.25);ctx.moveTo(-rx*1.3,cy+ry*0.25);ctx.lineTo(rx*1.3,cy+ry*0.25)}
+  ctx.stroke();
+  ctx.fillStyle=kind===2?w:d;for(const [x,y] of kind===2?[[-0.4,-0.3],[0.35,-0.1],[-0.2,0.25],[0.4,0.45],[0,-0.55],[-0.5,0.55]]:[[-0.45,0.5],[0,0.6],[0.45,0.5],[-0.45,-0.5],[0.45,-0.5]]){ctx.beginPath();ctx.arc(x*rx,cy+y*ry,s*0.035,0,6.283);ctx.fill()}
+  ctx.restore();
+  ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.ellipse(-rx*0.4,cy-ry*0.4,rx*0.12,ry*0.18,0.4,0,6.283);ctx.fill();
+}
+function drawBunny(s,br,t,b){
+  ctx.rotate(Math.sin(t*1.0+b.ph)*0.08);thread(s*0.12);
+  const cy=s*0.64,r=s*0.26,wig=Math.sin(t*2+b.ph)*0.08;
+  for(const sg of [-1,1]){ctx.save();ctx.translate(sg*r*0.42,cy-r*0.8);ctx.rotate(sg*(0.15+wig));
+    ctx.fillStyle='#fbf7f2';ctx.beginPath();ctx.ellipse(0,-r*0.6,r*0.26,r*0.72,0,0,6.283);ctx.fill();
+    ctx.fillStyle='#ffc1d3';ctx.beginPath();ctx.ellipse(0,-r*0.6,r*0.12,r*0.5,0,0,6.283);ctx.fill();ctx.restore()}
+  const g=ctx.createRadialGradient(-r*0.3,cy-r*0.3,0,0,cy,r*1.1);g.addColorStop(0,'#ffffff');g.addColorStop(1,'#e6ddd2');ctx.fillStyle=g;
+  ctx.beginPath();ctx.ellipse(0,cy,r,r*0.9,0,0,6.283);ctx.fill();
+  ctx.fillStyle='#2a2028';for(const sg of [-1,1]){ctx.beginPath();ctx.arc(sg*r*0.38,cy-r*0.05,r*0.09,0,6.283);ctx.fill()}
+  ctx.fillStyle='rgba(255,150,180,.55)';for(const sg of [-1,1]){ctx.beginPath();ctx.ellipse(sg*r*0.55,cy+r*0.25,r*0.14,r*0.09,0,0,6.283);ctx.fill()}
+  ctx.fillStyle='#ff8fb0';ctx.beginPath();ctx.moveTo(-r*0.09,cy+r*0.15);ctx.lineTo(r*0.09,cy+r*0.15);ctx.lineTo(0,cy+r*0.26);ctx.closePath();ctx.fill();
+}
+function drawChick(s,br,t,b){
+  ctx.rotate(Math.sin(t*1.2+b.ph)*0.1);thread(s*0.2);
+  const cy=s*0.58,r=s*0.3;
+  ctx.strokeStyle='#e0a400';ctx.lineWidth=Math.max(0.6,s*0.025);ctx.beginPath();for(const a of [-0.4,0,0.4]){ctx.moveTo(0,cy-r*0.9);ctx.quadraticCurveTo(Math.sin(a)*r*0.4,cy-r*1.15,Math.sin(a)*r*0.5,cy-r*1.25)}ctx.stroke();
+  const g=ctx.createRadialGradient(-r*0.3,cy-r*0.35,0,0,cy,r*1.1);g.addColorStop(0,'#fff3a6');g.addColorStop(1,'#f5b800');ctx.fillStyle=g;
+  ctx.beginPath();ctx.arc(0,cy,r,0,6.283);ctx.fill();
+  ctx.fillStyle='#e9a800';ctx.beginPath();ctx.ellipse(r*0.55,cy+r*0.2,r*0.3,r*0.2,-0.5,0,6.283);ctx.fill();
+  ctx.fillStyle='#2a2028';for(const sg of [-1,1]){ctx.beginPath();ctx.arc(sg*r*0.32,cy-r*0.15,r*0.09,0,6.283);ctx.fill()}
+  ctx.fillStyle='#ff8c1a';ctx.beginPath();ctx.moveTo(-r*0.14,cy+r*0.05);ctx.lineTo(r*0.14,cy+r*0.05);ctx.lineTo(0,cy+r*0.28);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#fffaf0';ctx.beginPath();ctx.moveTo(-r*1.02,cy+r*0.35);for(let k=0;k<=6;k++)ctx.lineTo(-r*1.02+k*r*0.34,cy+r*(k%2?0.18:0.38));ctx.lineTo(r*1.02,cy+r*0.4);ctx.quadraticCurveTo(0,cy+r*1.5,-r*1.02,cy+r*0.35);ctx.fill();
+}
+function drawTulip(s,br,t,b,gc){
+  gc=gc||[255,94,138];ctx.rotate(Math.sin(t*1.1+b.ph)*0.12);
+  ctx.strokeStyle='#4f8a3a';ctx.lineWidth=Math.max(0.8,s*0.05);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,s*0.3);ctx.stroke();
+  ctx.fillStyle='#5f9a3c';ctx.beginPath();ctx.ellipse(s*0.1,s*0.18,s*0.12,s*0.04,-0.6,0,6.283);ctx.fill();
+  const top=s*0.28,h=s*0.6,w=s*0.3;
+  const g=ctx.createLinearGradient(0,top,0,top+h);g.addColorStop(0,rgb(mix(gc,BLACK,0.25)));g.addColorStop(1,rgb(mix(gc,WHITE,0.25+0.5*br)));ctx.fillStyle=g;
+  ctx.beginPath();ctx.moveTo(-w*0.6,top);ctx.quadraticCurveTo(-w*1.15,top+h*0.55,-w*0.85,top+h);ctx.lineTo(-w*0.4,top+h*0.78);ctx.lineTo(0,top+h*1.02);ctx.lineTo(w*0.4,top+h*0.78);ctx.lineTo(w*0.85,top+h);ctx.quadraticCurveTo(w*1.15,top+h*0.55,w*0.6,top);ctx.closePath();ctx.fill();
+  ctx.strokeStyle=rgb(mix(gc,BLACK,0.3),0.5);ctx.lineWidth=Math.max(0.5,s*0.02);ctx.beginPath();ctx.moveTo(-w*0.3,top+h*0.1);ctx.lineTo(-w*0.4,top+h*0.78);ctx.moveTo(w*0.3,top+h*0.1);ctx.lineTo(w*0.4,top+h*0.78);ctx.stroke();
+}
+function drawHeart(s,br,t,b,gc){
+  gc=gc||[255,45,85];ctx.rotate(Math.sin(t*1.2+b.ph)*0.12);thread(s*0.14);
+  const cy=s*0.5,w=s*0.42;
+  ctx.beginPath();ctx.moveTo(0,cy-w*0.25);ctx.bezierCurveTo(0,cy-w*0.8,-w,cy-w*0.8,-w,cy-w*0.1);ctx.bezierCurveTo(-w,cy+w*0.45,-w*0.25,cy+w*0.65,0,cy+w*1.0);ctx.bezierCurveTo(w*0.25,cy+w*0.65,w,cy+w*0.45,w,cy-w*0.1);ctx.bezierCurveTo(w,cy-w*0.8,0,cy-w*0.8,0,cy-w*0.25);ctx.closePath();
+  const g=ctx.createRadialGradient(-w*0.35,cy-w*0.3,0,0,cy,w*1.3);g.addColorStop(0,rgb(mix(gc,WHITE,0.35+0.4*br)));g.addColorStop(1,rgb(mix(gc,BLACK,0.35*(1-br)+0.1)));ctx.fillStyle=g;ctx.fill();
+  ctx.fillStyle=`rgba(255,255,255,${0.3+0.35*br})`;ctx.beginPath();ctx.ellipse(-w*0.5,cy-w*0.25,w*0.15,w*0.09,-0.7,0,6.283);ctx.fill();
+}
+function drawBalloon(s,br,t,b,gc){
+  gc=gc||[255,89,94];const sw=Math.sin(t*1.5+b.ph);ctx.rotate(sw*0.1);
+  ctx.strokeStyle='rgba(230,230,240,.7)';ctx.lineWidth=Math.max(0.5,s*0.015);ctx.beginPath();ctx.moveTo(0,0);ctx.bezierCurveTo(s*0.08*sw,s*0.12,-s*0.08*sw,s*0.24,0,s*0.34);ctx.stroke();
+  const rx=s*0.3,ry=s*0.37,cy=s*0.38+ry;
+  ctx.fillStyle=rgb(mix(gc,BLACK,0.2));ctx.beginPath();ctx.moveTo(0,s*0.39);ctx.lineTo(-s*0.04,s*0.33);ctx.lineTo(s*0.04,s*0.33);ctx.closePath();ctx.fill();
+  const g=ctx.createRadialGradient(-rx*0.35,cy-ry*0.3,0,0,cy,ry*1.1);g.addColorStop(0,rgb(mix(gc,WHITE,0.45)));g.addColorStop(1,rgb(mix(gc,BLACK,0.25)));ctx.fillStyle=g;
+  ctx.beginPath();ctx.ellipse(0,cy,rx,ry,0,0,6.283);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.45)';ctx.beginPath();ctx.ellipse(-rx*0.4,cy-ry*0.35,rx*0.12,ry*0.2,0.4,0,6.283);ctx.fill();
+}
+function drawFlag(s,br,t,b,gc){
+  gc=gc||[255,202,58];ctx.rotate(Math.sin(t*1.6+b.ph)*0.08);
+  const w=s*0.42,h=s*0.95;
+  const g=ctx.createLinearGradient(-w,0,w,0);g.addColorStop(0,rgb(mix(gc,WHITE,0.15)));g.addColorStop(1,rgb(mix(gc,BLACK,0.15)));ctx.fillStyle=g;
+  ctx.beginPath();ctx.moveTo(-w,0);ctx.lineTo(w,0);ctx.lineTo(0,h);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.55)';for(const [x,y] of [[-0.45,0.15],[0.45,0.15],[0,0.2],[-0.2,0.42],[0.2,0.42],[0,0.65]]){ctx.beginPath();ctx.arc(x*w,y*h,s*0.035,0,6.283);ctx.fill()}
+}
 /* ---------- new year style ---------- */
 function drawBall(s,br,t,b,gc){
   gc=gc||[232,40,58];
@@ -774,6 +913,17 @@ const FIG={
   cone:{sz:1.0,len:0.6,gr:0,ga:0,glow:'#000000',draw:drawCone},
   candy:{sz:1.1,len:0.6,gr:0,ga:0,glow:'#000000',draw:drawCandy},
   icicle:{sz:1.0,len:0.6,gr:1.3,ga:0.45,glow:'#bfe6ff',draw:drawIcicle},
+  skull:{sz:1.0,len:0.55,gr:1.6,ga:0.55,glow:null,draw:drawSkull},
+  mistletoe:{sz:1.7,len:0.45,gr:0,ga:0,glow:'#000000',draw:drawMistletoe},
+  bigstar:{sz:2.4,len:0.57,gr:2.2,ga:1,glow:'#ffd25a',draw:drawStar},
+  snowflake:{sz:1.4,len:0.55,gr:1.6,ga:0.55,glow:'#cfeaff',draw:drawSnowPend},
+  egg:{sz:1.0,len:0.6,gr:0,ga:0,glow:'#000000',draw:drawEgg},
+  bunny:{sz:1.25,len:0.6,gr:0,ga:0,glow:'#000000',draw:drawBunny},
+  chick:{sz:1.1,len:0.6,gr:0,ga:0,glow:'#000000',draw:drawChick},
+  tulip:{sz:1.1,len:0.6,gr:1.8,ga:0.5,glow:null,draw:drawTulip},
+  heart:{sz:1.0,len:0.55,gr:1.9,ga:0.55,glow:null,draw:drawHeart},
+  balloon:{sz:1.3,len:0.8,gr:0,ga:0,glow:'#000000',draw:drawBalloon},
+  flag:{sz:1.0,len:0.45,gr:0,ga:0,glow:'#000000',draw:drawFlag},
 };
 
 /* ---------- render ---------- */
@@ -1109,11 +1259,12 @@ function tabShape(pn){
 }
 
 function tabHang(pn){
-  const st=cfg.style,isHal=st==='halloween'||HALLOWEEN.includes(st),isCozy=st==='cozy',isNY=st==='newyear';
+  const st=cfg.style,isHal=st==='halloween'||HALLOWEEN.includes(st),isCozy=st==='cozy',isNY=st==='newyear',grp=groupOf(st);
+  const pickStyle=k=>{cfg.style=k;const S=SETS[k];const pal=S?S.pal:k==='newyear'?'Новый год':(k==='halloween'||HALLOWEEN.includes(k))?'Хэллоуин':null;if(pal&&PALETTES[pal])cfg.palette=PALETTES[pal].slice();changed(true);rerender()};
+  const G=GROUPS.find(g=>g[0]===grp);
   pn.append(sec('Стиль',
-    cards([['classic','Классика','💡'],['halloween','Хэллоуин','🎃'],['cozy','Уютная','🐱'],['newyear','Новый год','🎄']],
-      k=>k==='halloween'?isHal:st===k,k=>{cfg.style=k;changed(true);rerender()}),
-    isHal?selectRow('Какие фигурки','style',[['halloween','Все вперемешку'],['pumpkin','Тыквы'],['ghost','Привидения'],['bat','Летучие мыши'],['cat','Чёрные кошки'],['spider','Пауки']],true):null,
+    cards(GROUPS.map(g=>[g[0],g[1],g[2]]),k=>grp===k,k=>{const g=GROUPS.find(x=>x[0]===k);pickStyle(g[3].length?g[3][0][0]:k)}),
+    G&&G[3].length>1?el('div',{className:'row'},el('label',null,el('span',null,'Вариант')),el('select',{on:{change:e=>pickStyle(e.target.value)}},...G[3].map(([v,l])=>el('option',{value:v,selected:v===st},l)))):null,
     el('div',{className:'btns'},el('button',{className:'wide',textContent:'✦ Готовый набор «Уютная осень»',on:{click:applyCozy}})),
     el('div',{className:'btns'},el('button',{className:'wide',textContent:'✦ Готовый набор «Новый год»',on:{click:applyNewYear}}))
   ));
