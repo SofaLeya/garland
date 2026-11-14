@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Гирлянда для OBS</title>
-<meta name="garland-version" content="2026-11-14.2">
+<meta name="garland-version" content="2026-11-14.3">
 <style>
 :root{--bg:#121018;--panel:#1b1822;--panel2:#24202d;--line:#332d3e;--text:#efeaf5;--muted:#9c94ab;--accent:#ffb347;--accent-ink:#2a1a05;--danger:#ff6b7d}
 *{box-sizing:border-box}
@@ -1078,7 +1078,7 @@ const SHAPE_ICONS={
   bottom:SH(SWAG(25)),
   layers:SH(SWAG(4),`<path d="${SWAG(7)}" fill="none" stroke="#c98a3a" stroke-width="1.6"/><path d="M2 5 Q12 16 22 5 Q32 16 42 5 Q50 14 58 5" fill="none" stroke="#a8743a" stroke-width="1.4"/>`)
 };
-const TABS=[['shape','Форма'],['hang','Подвески'],['weather','Погода'],['stream','Стрим'],['save','Сохранить']];
+const TABS=[['shape','Форма'],['hang','Подвески'],['weather','Погода'],['stream','Стрим'],['test','Тест'],['save','Сохранить']];
 const field=attrs=>el('input',Object.assign({style:'width:100%;background:#15121b;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;margin-bottom:8px'},attrs));
 const WARN=()=>el('div',{className:'linkwarn',style:'display:none;background:#3a2410;border:1px solid #ffb347;color:#ffd9a0;border-radius:8px;padding:8px 10px;margin:0 0 12px;font-size:12px'},el('b',null,'⚠ Ссылка не подойдёт для OBS. '),'Картинки, загруженные с компьютера, делают её слишком длинной. Подключи в OBS ',el('b',null,'скачанный файл'),' или добавь картинки по ссылке.');
 
@@ -1087,7 +1087,7 @@ function buildPanel(){
   pn.append(el('h1',null,'Гирлянда'),el('p',{className:'sub'},'Виджет для OBS'));
   if(FROM_FILE)pn.append(el('div',{style:'background:#1f2a3a;border:1px solid #4a6a9a;color:#cfe0ff;border-radius:8px;padding:8px 10px;margin:0 0 10px;font-size:12px'},'Это твой сохранённый файл. Новые функции он сам подтягивает с сайта, когда есть интернет. Изменения сохраняй кнопкой «Скачать файл» во вкладке «Сохранить».'));
   pn.append(el('div',{className:'tabs'},...TABS.map(([k,l])=>el('button',{className:panelTab===k?'on':'',textContent:l,on:{click:()=>{panelTab=k;try{localStorage.setItem('garland-tab',k)}catch(e){}pn.scrollTop=0;buildPanel()}}}))));
-  const T={shape:tabShape,hang:tabHang,weather:tabWeather,stream:tabStream,save:tabSave}[panelTab]||tabShape;
+  const T={shape:tabShape,hang:tabHang,weather:tabWeather,stream:tabStream,test:tabTest,save:tabSave}[panelTab]||tabShape;
   T(pn);
   drawThumbsRef=rerender;heatStatus();setTimeout(linkWarn,0);
 }
@@ -1256,6 +1256,48 @@ function tabStream(pn){
   ));
 }
 
+/* ---------- test tab: links to try viewer clicks in a browser ---------- */
+function testLink(provider,login,id){
+  // same garland, but without uploaded pictures (they make the link too long) and with the status box turned on
+  const c=Object.assign(JSON.parse(JSON.stringify(cfg)),{images:[],imgModes:[],imgSizes:[],imgPins:{},heatProvider:provider,heatLogin:login,heatId:id||''});
+  return LINK_BASE+'?view&debug=1#c='+enc(c);
+}
+function tabTest(pn){
+  const login=field({value:cfg.heatLogin||'',placeholder:'ник на Twitch'});
+  const box=el('div');
+  const linkRow=(title,url,note)=>{
+    const ta=el('textarea',{readOnly:true,value:url,style:'height:54px'});
+    return el('div',{style:'margin:0 0 12px'},el('div',{style:'font-weight:600;margin:0 0 6px'},title),
+      el('div',{className:'btns'},
+        el('button',{className:'small',textContent:'Открыть',on:{click:()=>window.open(url,'_blank')}}),
+        el('button',{className:'small',textContent:'Скопировать',on:{click:()=>{ta.select();try{navigator.clipboard.writeText(url).then(()=>toast('Скопировано'),()=>{})}catch(e){}}}})),
+      ta,note?el('p',{className:'note'},note):null);
+  };
+  const make=async()=>{
+    const v=login.value.trim().replace(/^@/,'').toLowerCase();box.innerHTML='';
+    if(!v){box.append(el('p',{className:'note'},'Впиши ник на Twitch'));return}
+    box.append(el('p',{className:'note'},'Собираю ссылки…'));
+    let id=/^\d+$/.test(v)?v:(cfg.heatLogin===v&&cfg.heatId)||'';
+    if(!id){try{const t=(await (await fetch('https://decapi.me/twitch/id/'+encodeURIComponent(v))).text()).trim();if(/^\d+$/.test(t))id=t}catch(e){}}
+    box.innerHTML='';
+    box.append(sec('GreenHeat - клики и потягивания',
+      linkRow('1. Гирлянда для теста',testLink('green',v,id),'Внизу слева будет табличка: связь и сколько событий пришло.'),
+      linkRow('2. Тестовый экран GreenHeat','https://heat.prod.kr/'+encodeURIComponent(v),'Это пульт самого GreenHeat: по нему можно кликать без эфира и без зрителей.'),
+      el('p',{className:'note',style:'white-space:pre-line'},'Как проверить:\n• открой обе ссылки в соседних окнах\n• в табличке на гирлянде дождись "связь: подключено"\n• кликни по тестовому экрану - через секунду на гирлянде появится кружок, провод дёрнется, а счётчик событий вырастет\n• зажми мышку на тестовом экране и поведи - если экран умеет передавать перетаскивание, провод потянется за мышкой\nКлики попадают в то же место экрана, куда ты кликаешь на пульте.')
+    ));
+    box.append(sec('Heat - только клики',
+      id?linkRow('1. Гирлянда для теста',testLink('heat',v,id),'Табличка внизу слева покажет связь и счётчик кликов.'):el('p',{className:'note'},'Не нашла канал с таким ником - проверь, как он пишется.'),
+      linkRow('2. Твой канал на Twitch','https://www.twitch.tv/'+encodeURIComponent(v),null),
+      el('p',{className:'note',style:'white-space:pre-line'},'У Heat нет тестового экрана, кликать можно только по живой трансляции:\n• запусти эфир (можно тестовый, без анонса)\n• проверь, что расширение Heat включено как "Оверлей"\n• открой гирлянду для теста и свой канал в соседних окнах\n• кликни по видео на Twitch - кружок и рывок появятся с задержкой трансляции, обычно пара секунд\nПотягивать Heat не умеет, только клики.')
+    ));
+    box.append(el('p',{className:'note'},'В тестовых ссылках гирлянда без твоих картинок - с ними ссылка получилась бы слишком длинной. Всё остальное как у тебя.'));
+  };
+  pn.append(sec('Проверка кликов в браузере',
+    el('p',{className:'note'},'Соберу ссылки на гирлянду с включённой табличкой связи - для GreenHeat и для Heat, плюс куда кликать.'),
+    login,el('div',{className:'btns'},el('button',{className:'primary',textContent:'Сформировать ссылки',on:{click:make}}))
+  ),box);
+  if(login.value)make();
+}
 function tabSave(pn){
   const url=LINK_BASE+'#c='+enc(cfg);
   const long=url.length>15000||FROM_FILE;
@@ -1342,7 +1384,7 @@ function heatConnect(){
   ws.onmessage=e=>{try{const m=JSON.parse(e.data);dbgEv(m);const x=parseFloat(m.x)*VW,y=parseFloat(m.y)*VH,id=String(m.id||'anon');if(m.type==='release'){releaseDrag(id);return}if(!isFinite(x)||!isFinite(y))return;if(m.type==='click'){if(!drags.has(id))tugAt(x,y)}else if(m.type==='drag')dragAt(id,x,y)}catch(err){}};
   ws.onclose=()=>{heatState='error';heatStatus();heatWs=null;clearTimeout(heatConnect.t);heatConnect.t=setTimeout(heatConnect,Math.min(30000,2000*(++heatRetry)))};
 }
-const DBG=qs.get('debug')==='1';let dbgEl=null,dbgN=0,dbgLast='—';
+const DBG=qs.get('debug')==='1';if(DBG&&!EDIT&&!IN_OBS)document.documentElement.style.background='linear-gradient(#0c1024,#1b1e3d 70%,#262547)';let dbgEl=null,dbgN=0,dbgLast='—';
 function dbgEv(m){dbgN++;dbgLast=(m.type||'?')+' '+new Date().toLocaleTimeString();dbgShow()}
 function dbgShow(){
   if(!DBG)return;
