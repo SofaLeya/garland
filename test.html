@@ -363,13 +363,15 @@ function windAt(t,x){
   const w=cfg.wind,g=cfg.gust;
   const wave=0.5+0.5*Math.sin(t*0.8-x*0.0025);
   const gust=Math.max(0,Math.sin(t*0.31)*0.6+Math.sin(t*0.97+1.7)*0.4+Math.sin(t*2.3+x*0.003)*0.25);
-  return (w*(0.35+0.65*wave)+w*g*gust*1.6)*0.1*windDir(t);
+  return (w*(0.35+0.65*wave)+w*g*gust*1.6)*0.1*windDir(t)+blow.t*0.4*blow.dir*(0.7+0.3*wave);
 }
+const blow={t:0,dir:1};
 // slow change of wind direction: blows right, calms down, blows left (periods of a few minutes)
 function windDir(t){const d=Math.sin(t*0.043+0.7)*0.8+Math.sin(t*0.019+2.1)*0.45;return Math.max(-1,Math.min(1,d*1.1))}
 let grab=null,mouse={x:0,y:0};
 function step(dt,settle){
   simT+=1/60;const t=simT;const G=0.45;
+  if(blow.t>0)blow.t=Math.max(0,blow.t-1/150);
   for(const ch of chains){
     for(const p of ch.P){
       if(p.pin)continue;
@@ -1861,48 +1863,57 @@ function copyText(t,ok,ta){
   const fallback=()=>{try{let a=ta;let tmp=false;if(!a){a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(a);tmp=true}a.focus();a.select();const r=document.execCommand('copy');if(tmp)a.remove();if(r)ok()}catch(e){}};
   if(window.isSecureContext&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fallback)}else fallback();
 }
-/* Heat events arrive two ways: directly (WebSocket) and through the bot relay (SSE). Either one is enough. */
-let heatSse=null,heatSseUrl='',heatSseOk=false,heatWsOk=false,heatLastEv='';
-function heatSync(){heatState=(heatWsOk||heatSseOk)?'on':(heatWs||heatSse)?'connecting':'error';heatStatus()}
-function heatHandle(raw){
-  try{
-    const m=JSON.parse(raw);
-    const key=m.type+'|'+(m.id||'')+'|'+m.x+'|'+m.y,now=performance.now();
-    if(heatHandle.k===key&&now-heatHandle.t<250)return;
-    heatHandle.k=key;heatHandle.t=now;
-    dbgEv(m);
-    const x=parseFloat(m.x)*VW,y=parseFloat(m.y)*VH,id=String(m.id||'anon');
-    if(m.type==='release'){releaseDrag(id);return}
-    if(!isFinite(x)||!isFinite(y))return;
-    if(m.type==='click'){if(!drags.has(id))tugAt(x,y)}else if(m.type==='drag')dragAt(id,x,y);
-  }catch(err){}
+/* ---------- chat commands (anonymous Twitch IRC, works without any extension) ---------- */
+const CHAT_PUSH=['!толкнуть','!толкать','!дёрнуть','!дернуть','!дёрни','!дерни'];
+const CHAT_BLOW=['!дуть','!дунуть','!подуть','!фуф','!шуш'];
+let chatWs=null,chatLogin='',chatOk=false,chatRetry=0,chatTimer=0,chatLastCmd=0;
+function chatCommand(text){
+  const w=(text||'').trim().toLowerCase().split(/\s+/)[0];
+  const now=performance.now();
+  const push=CHAT_PUSH.includes(w),blowIt=CHAT_BLOW.includes(w);
+  if(!push&&!blowIt)return;
+  if(now-chatLastCmd<250)return;chatLastCmd=now;
+  dbgEv({type:'chat '+w});
+  if(blowIt){blow.dir=Math.random()<0.5?-1:1;blow.t=1;return}
+  const ps=[];for(const ch of chains)for(const p of ch.P)if(!p.pin)ps.push(p);
+  if(!ps.length)return;
+  const p=ps[Math.random()*ps.length|0];tugAt(p.x,p.y);
 }
-function sseConnect(){
-  const green=cfg.heatProvider==='green';
-  const url=(!green&&cfg.heatId)?'https://bot.quantum0.ru/sse/'+encodeURIComponent(cfg.heatId)+'/heat':'';
-  if(url===heatSseUrl&&(heatSse||!url))return;
-  if(heatSse){try{heatSse.close()}catch(e){}heatSse=null}
-  heatSseOk=false;heatSseUrl=url;
-  if(!url){heatSync();return}
-  try{
-    const es=new EventSource(url);heatSse=es;
-    es.onopen=()=>{heatSseOk=true;heatSync()};
-    es.onmessage=e=>heatHandle(e.data);
-    es.onerror=()=>{heatSseOk=(es.readyState===1);heatSync()};
-  }catch(e){heatSse=null;heatSync()}
+function chatConnect(){
+  const login=(cfg.heatLogin||'').trim().replace(/^@/,'').toLowerCase();
+  const ok=/^[a-z0-9_]{3,25}$/.test(login)&&!/^\d+$/.test(login);
+  const want=ok?login:'';
+  if(want===chatLogin&&(chatWs||!want))return;
+  clearTimeout(chatTimer);
+  if(chatWs){try{chatWs.onclose=null;chatWs.close()}catch(e){}chatWs=null}
+  chatOk=false;chatLogin=want;
+  if(!want){dbgShow();return}
+  let ws;try{ws=new WebSocket('wss://irc-ws.chat.twitch.tv:443')}catch(e){chatWs=null;return}
+  chatWs=ws;
+  ws.onopen=()=>{ws.send('PASS SCHMOOPIIE');ws.send('NICK justinfan'+(10000+Math.floor(Math.random()*80000)));ws.send('JOIN #'+want)};
+  ws.onmessage=e=>{
+    for(const line of String(e.data).split('\r\n')){
+      if(!line)continue;
+      if(line.startsWith('PING')){ws.send('PONG'+line.slice(4));continue}
+      if(/^:\S+ 366 /.test(line)){chatOk=true;chatRetry=0;dbgShow();continue}
+      const m=line.match(/^(?:@\S+ )?:[^ ]+ PRIVMSG #\S+ :(.*)$/);
+      if(m)chatCommand(m[1]);
+    }
+  };
+  ws.onclose=()=>{chatOk=false;chatWs=null;dbgShow();const l=chatLogin;chatLogin='';clearTimeout(chatTimer);chatTimer=setTimeout(()=>{if((cfg.heatLogin||'').trim().replace(/^@/,'').toLowerCase()===l)chatConnect()},Math.min(30000,2000*(++chatRetry)))};
 }
+window.addEventListener('beforeunload',()=>{try{chatWs&&chatWs.close()}catch(e){}});
 function heatConnect(){
+  chatConnect();
   if(heatWs){try{heatWs.onclose=null;heatWs.close()}catch(e){}heatWs=null}
-  heatWsOk=false;
   const green=cfg.heatProvider==='green';
-  sseConnect();
   if(green?!cfg.heatLogin:!cfg.heatId){heatState='off';heatStatus();return}
-  heatSync();
-  let ws;try{ws=new WebSocket(green?'wss://heat.prod.kr/'+encodeURIComponent(cfg.heatLogin):'wss://heat-api.j38.net/channel/'+encodeURIComponent(cfg.heatId))}catch(e){heatWs=null;heatSync();return}
+  heatState='connecting';heatStatus();
+  let ws;try{ws=new WebSocket(green?'wss://heat.prod.kr/'+encodeURIComponent(cfg.heatLogin):'wss://heat-api.j38.net/channel/'+encodeURIComponent(cfg.heatId))}catch(e){heatState='error';heatStatus();return}
   heatWs=ws;
-  ws.onopen=()=>{heatWsOk=true;heatRetry=0;heatSync()};
-  ws.onmessage=e=>heatHandle(e.data);
-  ws.onclose=()=>{heatWsOk=false;heatWs=null;heatSync();clearTimeout(heatConnect.t);heatConnect.t=setTimeout(heatConnect,Math.min(30000,2000*(++heatRetry)))};
+  ws.onopen=()=>{heatState='on';heatRetry=0;heatStatus()};
+  ws.onmessage=e=>{try{const m=JSON.parse(e.data);dbgEv(m);const x=parseFloat(m.x)*VW,y=parseFloat(m.y)*VH,id=String(m.id||'anon');if(m.type==='release'){releaseDrag(id);return}if(!isFinite(x)||!isFinite(y))return;if(m.type==='click'){if(!drags.has(id))tugAt(x,y)}else if(m.type==='drag')dragAt(id,x,y)}catch(err){}};
+  ws.onclose=()=>{heatState='error';heatStatus();heatWs=null;clearTimeout(heatConnect.t);heatConnect.t=setTimeout(heatConnect,Math.min(30000,2000*(++heatRetry)))};
 }
 const DBG=qs.get('debug')==='1';if(DBG&&!EDIT&&!IN_OBS)document.documentElement.style.background='linear-gradient(#0c1024,#1b1e3d 70%,#262547)';let dbgEl=null,dbgN=0,dbgLast='—';
 function dbgEv(m){dbgN++;dbgLast=(m.type||'?')+' '+new Date().toLocaleTimeString();dbgShow()}
@@ -1910,7 +1921,7 @@ function dbgShow(){
   if(!DBG)return;
   if(!dbgEl){dbgEl=document.createElement('div');dbgEl.style.cssText='position:fixed;left:8px;bottom:8px;font:13px monospace;color:#fff;background:rgba(0,0,0,.6);padding:6px 9px;border-radius:6px;z-index:99;white-space:pre';document.body.appendChild(dbgEl)}
   const green=cfg.heatProvider==='green';
-  dbgEl.textContent=`расширение: ${green?'GreenHeat':'Heat'}\nканал: ${green?(cfg.heatLogin||'не указан'):(cfg.heatLogin||'')+' (id '+(cfg.heatId||'нет')+')'}\nпрямой Heat: ${heatWsOk?'да':'нет'}, релей бота: ${heatSseOk?'да':'нет'}\nсвязь: ${{off:'не настроено',connecting:'подключаюсь',on:'подключено',error:'нет связи'}[heatState]}\nсобытий пришло: ${dbgN}, последнее: ${dbgLast}`;
+  dbgEl.textContent=`расширение: ${green?'GreenHeat':'Heat'}\nканал: ${green?(cfg.heatLogin||'не указан'):(cfg.heatLogin||'')+' (id '+(cfg.heatId||'нет')+')'}\nчат Twitch: ${chatOk?'да':'нет'}\nсвязь: ${{off:'не настроено',connecting:'подключаюсь',on:'подключено',error:'нет связи'}[heatState]}\nсобытий пришло: ${dbgN}, последнее: ${dbgLast}`;
 }
 function heatStatus(){dbgShow();const el=document.getElementById('heatst');if(!el)return;el.textContent={off:'Не подключено',connecting:'Подключаюсь…',on:'✓ Подключено — клики зрителей будут приходить',error:'Нет связи с Heat, пробую ещё раз…'}[heatState]}
 
