@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Гирлянда для OBS</title>
-<meta name="garland-version" content="2026-11-02.1">
+<meta name="garland-version" content="2026-11-14.1">
 <style>
 :root{--bg:#121018;--panel:#1b1822;--panel2:#24202d;--line:#332d3e;--text:#efeaf5;--muted:#9c94ab;--accent:#ffb347;--accent-ink:#2a1a05;--danger:#ff6b7d}
 *{box-sizing:border-box}
@@ -124,6 +124,7 @@ const PALETTES = {
   'Рубин и золото': ['#ff2a4a','#ffc34a'],
   'Неон': ['#ff00e6','#00f0ff','#7cff00','#ffea00'],
   'Хэллоуин': ['#ff7a00','#9b4dff','#5dff3a'],
+  'Новый год': ['#e8283a','#ffd25a','#2fbf71','#4aa3ff','#f4f4f4'],
 };
 const DEFAULT = {
   v:1,
@@ -131,7 +132,7 @@ const DEFAULT = {
   sag:0.07, spacing:320,
   bulbGap:34, bulbSize:13,
   palette:PALETTES['Классика'].slice(),
-  mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false, czEdison:true, czCat:true, czGhost:true, czDot:true, czBead:true, czLeaf:true, czEvery:10,
+  mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false, czEdison:true, czCat:true, czGhost:true, czDot:true, czBead:true, czLeaf:true, czEvery:10, nyBall:true, nyStar:true, nyCone:true, nyCandy:true, nyIcicle:true, nyDot:true,
   wireColor:'#1a2a1e', wire:2.5,
   images:[], imgModes:[], imgSizes:[], imgPins:{}, imgCount:1, imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
   snow:140, flake:1, stick:true, fall:'snow', snowLook:'soft', leafLook:'mix', petalLook:'pinkred', fallTransp:0, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
@@ -152,7 +153,7 @@ function loadCfg(){
 }
 let cfg=loadCfg();
 let saveT=0;
-function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('garland-cfg',JSON.stringify(cfg))}catch(e){}},300)}
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('garland-cfg',JSON.stringify(cfg))}catch(e){}updDirty()},300)}
 
 /* ---------- helpers ---------- */
 const hexCache=new Map();
@@ -178,13 +179,14 @@ async function gifBytes(src){
   return new Uint8Array(await (await fetch(src)).arrayBuffer());
 }
 // self-contained GIF decoder (works in any browser, including the one inside OBS)
-function parseGif(d){
+function parseGif(d,maxSide){
   let p=0;const u8=()=>d[p++],u16=()=>{const v=d[p]|(d[p+1]<<8);p+=2;return v};
   if(String.fromCharCode(d[0],d[1],d[2])!=='GIF')throw 0;p=6;
   const W=u16(),H=u16(),fl=u8();u8();u8();
   let gct=null;if(fl&0x80){const n=2<<(fl&7);gct=d.subarray(p,p+n*3);p+=n*3}
   const cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d',{willReadFrequently:true});
-  const frames=[];let delay=100,trans=-1,disp=0;let prev=null;
+  const fk=Math.min(1,(maxSide||1e9)/Math.max(W,H)),FW=Math.max(1,Math.round(W*fk)),FH=Math.max(1,Math.round(H*fk));
+  const frames=[];frames.full=Math.max(W,H);let delay=100,trans=-1,disp=0;let prev=null;
   while(p<d.length){
     const b=u8();
     if(b===0x3B)break;
@@ -204,7 +206,7 @@ function parseGif(d){
     const rows=[];if(inter){for(const [st,stp] of [[0,8],[4,8],[2,4],[1,2]])for(let r=st;r<h;r+=stp)rows.push(r)}else for(let r=0;r<h;r++)rows.push(r);
     for(let i=0;i<h;i++){const r=rows[i];for(let c=0;c<w;c++){const ci=px[i*w+c];if(ci===trans||ci===undefined)continue;const o=(r*w+c)*4;id[o]=ct[ci*3];id[o+1]=ct[ci*3+1];id[o+2]=ct[ci*3+2];id[o+3]=255}}
     g.putImageData(img,x,y);
-    const fc=document.createElement('canvas');fc.width=W;fc.height=H;fc.getContext('2d').drawImage(cv,0,0);
+    const fc=document.createElement('canvas');fc.width=FW;fc.height=FH;const fg=fc.getContext('2d');fg.imageSmoothingQuality='high';fg.drawImage(cv,0,0,FW,FH);
     frames.push({bmp:fc,dur:Math.max(20,delay)});
     if(disp===2)g.clearRect(x,y,w,h);else if(disp===3&&prev)g.putImageData(prev,0,0);
     delay=100;trans=-1;disp=0;
@@ -233,8 +235,8 @@ function lzw(data,mcs,npix){
   }
   return out;
 }
-async function decodeGif(src){
-  const fr=parseGif(await gifBytes(src));
+async function decodeGif(src,maxSide){
+  const fr=parseGif(await gifBytes(src),maxSide);
   return fr;
 }
 function measureImg(o,srcs,fullFrame){try{
@@ -249,14 +251,18 @@ function measureImg(o,srcs,fullFrame){try{
   for(let y=y0;y<=y1;y++){let sx=0,n=0;for(let x=x0;x<=x1;x++)if(d[(y*N+x)*4+3]>30){sx+=x;n++}if(n){o.ax=((sx/n+0.5)/N-o.bb[0])/o.bb[2];break}}
 }catch(e){}}
 function imgFrame(o,ph){if(!o.frames)return o.img;let tm=(performance.now()+ph*1000)%o.total;for(const f of o.frames){if(tm<f.dur)return f.bmp;tm-=f.dur}return o.frames[0].bmp}
+// how many pixels a GIF frame needs to look sharp at its current size on screen
+function gifNeed(i){return Math.max(128,Math.ceil(cfg.bulbSize*cfg.imgSize*((cfg.imgSizes&&cfg.imgSizes[i])||1)*2.5))}
+function gifDecode(o,i){const need=gifNeed(i);o.dec=true;decodeGif(o.src,need).then(fr=>{o.dec=false;if(fr&&fr.length>1){o.frames=fr;o.fmax=need;o.fullSide=fr.full;o.total=fr.reduce((a,f)=>a+f.dur,0);measureImg(o,fr.map(f=>f.bmp))}}).catch(()=>{o.dec=false})}
+function ensureGifRes(){imgs.forEach((o,i)=>{if(o.isGif&&o.frames&&!o.dec&&o.fmax<o.fullSide&&gifNeed(i)>o.fmax*1.05)gifDecode(o,i)})}
 function loadImages(){
-  imgs=cfg.images.map(src=>{
+  imgs=cfg.images.map((src,i)=>{
     const o={img:new Image(),hex:'#ffffff',ok:false};
     o.img.onload=()=>{o.ok=true;try{const c=document.createElement('canvas');c.width=c.height=8;const g=c.getContext('2d');g.drawImage(o.img,0,0,8,8);const d=g.getImageData(0,0,8,8).data;let r=0,gg=0,b=0,n=0;for(let i=0;i<d.length;i+=4){const a=d[i+3]/255;r+=d[i]*a;gg+=d[i+1]*a;b+=d[i+2]*a;n+=a}if(n>0){const t=x=>Math.min(255,Math.round(x/n*1.15)).toString(16).padStart(2,'0');o.hex='#'+t(r)+t(gg)+t(b)}}catch(e){}};
     const isGif=/^data:image\/gif|\.gif(\?|$)/i.test(src);
     o.img.addEventListener('load',()=>{if(!o.frames)measureImg(o,[o.img],isGif)});
     o.ax=0.5;o.bb=[0,0,1,1];o.frames=null;
-    if(/^data:image\/gif|\.gif(\?|$)/i.test(src))decodeGif(src).then(fr=>{if(fr&&fr.length>1){o.frames=fr;o.total=fr.reduce((a,f)=>a+f.dur,0);measureImg(o,fr.map(f=>f.bmp))}}).catch(()=>{});
+    o.src=src;o.isGif=isGif;if(isGif)gifDecode(o,i);
     o.img.crossOrigin='anonymous';o.img.src=src;return o;
   });
 }
@@ -315,6 +321,7 @@ function assignImages(T){
 function build(){
   {const v=document.getElementById('layersval');if(v)v.textContent=cfg.shape.filter(s=>s.layer).length}
   if(typeof drags!=='undefined')drags.clear();
+  ensureGifRes();
   chains=[];bulbs=[];let gi=0;
   cfg.shape.forEach((s,idx)=>{const A=anchorsOf(s);if(A&&A.length>1)chains.push(makeChain(A,idx))});
   const slots=[];
@@ -344,8 +351,10 @@ function windAt(t,x){
   const w=cfg.wind,g=cfg.gust;
   const wave=0.5+0.5*Math.sin(t*0.8-x*0.0025);
   const gust=Math.max(0,Math.sin(t*0.31)*0.6+Math.sin(t*0.97+1.7)*0.4+Math.sin(t*2.3+x*0.003)*0.25);
-  return (w*(0.35+0.65*wave)+w*g*gust*1.6)*0.1;
+  return (w*(0.35+0.65*wave)+w*g*gust*1.6)*0.1*windDir(t);
 }
+// slow change of wind direction: blows right, calms down, blows left (periods of a few minutes)
+function windDir(t){const d=Math.sin(t*0.043+0.7)*0.8+Math.sin(t*0.019+2.1)*0.45;return Math.max(-1,Math.min(1,d*1.1))}
 let grab=null,mouse={x:0,y:0};
 function step(dt,settle){
   simT+=1/60;const t=simT;const G=0.45;
@@ -475,6 +484,7 @@ function newFlake(x,y,tmp,kind){
   kind=kind||cfg.fall;
   const r=(0.8+Math.random()*2.2)*cfg.flake;
   const f={kind,x,y,r,ph:Math.random()*6.283,vy:0.5+r*0.32+Math.random()*0.4,tmp,rot:Math.random()*6.283,vr:(Math.random()-0.5)*0.06,fl:Math.random()*6.283,vf:0.02+Math.random()*0.05};
+  if(kind==='snow'&&!tmp)f.canStick=Math.random()<0.12;
   if(kind==='snow'&&!tmp&&(cfg.snowLook==='flakes'||(cfg.snowLook==='mixed'&&Math.random()<0.4))){f.spr=pick(snowSprites);f.w=8+r*5;f.cr=true;f.vr=(Math.random()-0.5)*0.03}
   if(kind==='petals'){const L=cfg.petalLook;f.vy=0.5+Math.random()*0.7;f.spr=pick(L==='sakura'?sakuraSprites:L==='roses'?roseSprites:L==='white'?whitePetalSprites:petalSprites);f.w=(L==='roses'?14:10)+r*5}
   if(kind==='leaves'){const L=cfg.leafLook;f.vy=0.7+Math.random()*0.8;f.vr*=1.5;
@@ -509,7 +519,7 @@ function updateFlakes(t){
       f.rot+=f.vr+windAt(t,f.x)*0.05;f.fl+=f.vf;
     }
     gone=f.y>(cfg.fallDepth<1&&!f.tmp?VH*cfg.fallDepth+20:VH+40)||f.x<-260||f.x>VW+260;
-    if(!gone&&cfg.stick&&!f.tmp&&f.kind==='snow'){
+    if(!gone&&cfg.stick&&!f.tmp&&f.kind==='snow'&&f.canStick){
       for(let c=0;c<chains.length&&!gone;c++){
         if(f.y<boxes[c][0]||f.y>boxes[c][1])continue;
         const P=chains[c].P;
@@ -519,7 +529,7 @@ function updateFlakes(t){
           const ex=b.x-a.x,ey=b.y-a.y,ll=ex*ex+ey*ey||1;let u=((f.x-a.x)*ex+(f.y-a.y)*ey)/ll;u=Math.max(0,Math.min(1,u));
           const qx=a.x+ex*u,qy=a.y+ey*u;const dist=Math.hypot(f.x-qx,f.y-qy);
           if(dist<cfg.wire*0.5+f.r+1&&f.y<=qy+1&&Math.abs(ey)/Math.sqrt(ll)<0.8){
-            if(Math.random()<0.7){const add=0.022*f.r;const j=u<0.5?i:i+1;P[j].snow=Math.min(1,P[j].snow+add);if(P[j-1])P[j-1].snow=Math.min(1,P[j-1].snow+add*.4);if(P[j+1])P[j+1].snow=Math.min(1,P[j+1].snow+add*.4);gone=true}
+            {const add=0.022*f.r;const j=u<0.5?i:i+1;if(P[j].snow>=1){f.canStick=false;break}P[j].snow=Math.min(1,P[j].snow+add);if(P[j-1])P[j-1].snow=Math.min(1,P[j-1].snow+add*.4);if(P[j+1])P[j+1].snow=Math.min(1,P[j+1].snow+add*.4);gone=true}
             break;
           }
         }
@@ -537,6 +547,7 @@ function isPendSlot(gi){const E=Math.max(3,cfg.czEvery|0);return cfg.style==='co
 function figureOf(gi){
   const st=cfg.style;
   if(st==='halloween')return HALLOWEEN[gi%HALLOWEEN.length];
+  if(st==='newyear'){let pat=['ball','dot','star','dot','cone','dot','ball','dot','candy','dot','icicle','dot'].filter(k=>cfg['ny'+k[0].toUpperCase()+k.slice(1)]);if(!pat.length)pat=['ball'];return pat[gi%pat.length]}
   if(HALLOWEEN.includes(st))return st;
   if(st==='cozy'){
     const E=Math.max(3,cfg.czEvery|0);
@@ -697,6 +708,52 @@ function drawSpider(s,br,t,b,gc,Lfix){
   ctx.fillStyle=`rgba(255,${40+60*br|0},40,${0.5+0.5*br})`;
   ctx.beginPath();ctx.arc(-s*0.045,hy+s*0.03,s*0.025,0,6.283);ctx.arc(s*0.045,hy+s*0.03,s*0.025,0,6.283);ctx.fill();
 }
+/* ---------- new year style ---------- */
+function drawBall(s,br,t,b,gc){
+  gc=gc||[232,40,58];
+  ctx.strokeStyle='rgba(210,210,220,.6)';ctx.lineWidth=Math.max(0.5,s*0.02);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,s*0.08);ctx.stroke();
+  ctx.fillStyle='#d8b55a';ctx.beginPath();ctx.roundRect(-s*0.09,s*0.07,s*0.18,s*0.12,s*0.03);ctx.fill();
+  const r=s*0.42,cy=s*0.17+r;
+  const g=ctx.createRadialGradient(-r*0.35,cy-r*0.4,0,0,cy,r);
+  g.addColorStop(0,rgb(mix(gc,WHITE,0.45+0.35*br)));g.addColorStop(0.55,rgb(gc));g.addColorStop(1,rgb(mix(gc,BLACK,0.5)));
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,cy,r,0,6.283);ctx.fill();
+  if(b.gi%3===0){ctx.strokeStyle=`rgba(255,226,140,${0.55+0.35*br})`;ctx.lineWidth=Math.max(0.6,s*0.05);ctx.beginPath();ctx.ellipse(0,cy,r*0.98,r*0.28,0,0,Math.PI);ctx.stroke()}
+  ctx.fillStyle=`rgba(255,255,255,${0.35+0.4*br})`;ctx.beginPath();ctx.ellipse(-r*0.38,cy-r*0.42,r*0.16,r*0.1,-0.6,0,6.283);ctx.fill();
+}
+function drawStar(s,br,t,b){
+  ctx.rotate(Math.sin(t*1.1+b.ph)*0.12);
+  ctx.strokeStyle='rgba(210,210,220,.6)';ctx.lineWidth=Math.max(0.5,s*0.02);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,s*0.14);ctx.stroke();
+  const R=s*0.45,cy=s*0.12+R,ri=R*0.45;
+  ctx.beginPath();for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,rr=k%2?ri:R;ctx.lineTo(Math.cos(a)*rr,cy+Math.sin(a)*rr)}ctx.closePath();
+  const g=ctx.createRadialGradient(0,cy,0,0,cy,R);g.addColorStop(0,rgb(mix([255,240,170],WHITE,0.4*br)));g.addColorStop(1,rgb(mix([240,180,40],BLACK,0.25*(1-br))));
+  ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='#b8861f';ctx.lineWidth=Math.max(0.6,s*0.035);ctx.stroke();
+}
+function drawCone(s,br,t,b){
+  ctx.rotate(Math.sin(t*1.0+b.ph)*0.08);
+  ctx.strokeStyle='#6b4a2a';ctx.lineWidth=Math.max(0.7,s*0.05);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,s*0.2);ctx.stroke();
+  const cy=s*0.62,w=s*0.27,h=s*0.45;
+  const g=ctx.createLinearGradient(-w,0,w,0);g.addColorStop(0,'#a8703f');g.addColorStop(1,'#5a3418');
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(0,cy,w,h,0,0,6.283);ctx.fill();
+  ctx.strokeStyle='rgba(40,20,8,.6)';ctx.lineWidth=Math.max(0.5,s*0.03);ctx.beginPath();
+  for(let r=0;r<5;r++){const y=cy-h*0.75+r*h*0.36;const q=(y-cy)/h;if(Math.abs(q)>=1)continue;const ww=w*Math.sqrt(1-q*q);const off=r%2?0.5:0;
+    for(let k=-2;k<=2;k++){const x=(k+off)*ww*0.45;if(Math.abs(x)>ww*0.8)continue;ctx.moveTo(x-ww*0.22,y);ctx.quadraticCurveTo(x,y+h*0.2,x+ww*0.22,y)}}
+  ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.ellipse(0,cy-h*0.82,w*0.5,h*0.12,0,0,6.283);ctx.fill();
+}
+function drawCandy(s,br,t,b){
+  ctx.rotate(Math.sin(t*1.2+b.ph)*0.15);
+  const lw=Math.max(1.2,s*0.11),r=s*0.13,cy=r+lw/2;
+  ctx.lineCap='round';ctx.beginPath();ctx.moveTo(r,cy+r*0.7);ctx.lineTo(r,cy);ctx.arc(0,cy,r,0,Math.PI,true);ctx.lineTo(-r,s*1.05);
+  ctx.strokeStyle='#f6f2ee';ctx.lineWidth=lw;ctx.stroke();
+  ctx.lineCap='butt';ctx.setLineDash([lw*0.9,lw*0.9]);ctx.strokeStyle='#d81f2e';ctx.stroke();ctx.setLineDash([]);ctx.lineCap='round';
+}
+function drawIcicle(s,br,t,b){
+  const w=s*0.13,L=s*1.15;
+  ctx.beginPath();ctx.moveTo(-w,0);ctx.quadraticCurveTo(-w*0.8,L*0.5,0,L);ctx.quadraticCurveTo(w*0.8,L*0.5,w,0);ctx.closePath();
+  const g=ctx.createLinearGradient(0,0,0,L);g.addColorStop(0,'rgba(235,248,255,.9)');g.addColorStop(0.5,`rgba(150,205,255,${0.5+0.3*br})`);g.addColorStop(1,'rgba(200,235,255,.15)');
+  ctx.fillStyle=g;ctx.fill();
+  ctx.strokeStyle=`rgba(255,255,255,${0.5+0.4*br})`;ctx.lineWidth=Math.max(0.5,s*0.03);ctx.beginPath();ctx.moveTo(-w*0.35,s*0.05);ctx.quadraticCurveTo(-w*0.3,L*0.4,-w*0.05,L*0.75);ctx.stroke();
+}
 // len: hang distance (× size) to the glow centre; gr: glow radius; glow: fixed glow colour (null → palette)
 const FIG={
   bulb:{len:1.0,gr:3.4,ga:1,glow:null},
@@ -712,6 +769,11 @@ const FIG={
   edison:{sz:1.6,cord:true,gr:1.5,ga:1,glow:'#ffb35a',draw:drawEdison},
   catlamp:{sz:2.0,cord:true,gr:1.3,ga:0.9,glow:'#ffd25a',draw:drawCatLamp},
   neonghost:{sz:2.0,cord:true,gr:1.2,ga:0.8,glow:'#5fe8ff',draw:drawNeonGhost},
+  ball:{sz:1.0,len:0.6,gr:1.8,ga:0.45,glow:null,draw:drawBall},
+  star:{sz:1.15,len:0.57,gr:2.2,ga:0.8,glow:'#ffd25a',draw:drawStar},
+  cone:{sz:1.0,len:0.6,gr:0,ga:0,glow:'#000000',draw:drawCone},
+  candy:{sz:1.1,len:0.6,gr:0,ga:0,glow:'#000000',draw:drawCandy},
+  icicle:{sz:1.0,len:0.6,gr:1.3,ga:0.45,glow:'#bfe6ff',draw:drawIcicle},
 };
 
 /* ---------- render ---------- */
@@ -783,7 +845,7 @@ function render(){
     if(o.im){
       ctx.fillStyle=sock;ctx.fillRect(-s*0.06,-1,s*0.12,s*0.14);
       if(o.im.ok){const nw=o.im.img.naturalWidth,nh=o.im.img.naturalHeight,bb=o.im.bb;const iw=nw*bb[2],ih=nh*bb[3];const k=s/Math.max(iw,ih);const w=iw*k,h=ih*k;
-        ctx.globalAlpha=0.72+0.28*o.br;ctx.drawImage(imgFrame(o.im,o.b.ph),bb[0]*nw,bb[1]*nh,iw,ih,-w*o.im.ax,s*0.62-h/2+s*0.06,w,h);ctx.globalAlpha=1}
+        ctx.globalAlpha=0.72+0.28*o.br;const fr=imgFrame(o.im,o.b.ph),sk=o.im.frames?fr.width/nw:1;ctx.drawImage(fr,bb[0]*nw*sk,bb[1]*nh*sk,iw*sk,ih*sk,-w*o.im.ax,s*0.62-h/2+s*0.06,w,h);ctx.globalAlpha=1}
       ctx.restore();continue;
     }
     if(o.b.kind!=='bulb'){
@@ -956,6 +1018,11 @@ function setLayers(n){
   building=-1;build();save();
   const v=document.getElementById('layersval');if(v)v.textContent=n;
 }
+function applyNewYear(){
+  Object.assign(cfg,{style:'newyear',palette:PALETTES['Новый год'].slice(),wireColor:'#1f3a24',wire:2,vine:true,bulbGap:24,figSize:1.6,mode:'twinkle',speed:0.6,glow:1,
+    fall:'snow',snowLook:'mixed',stick:true,fallDepth:1,fallClear:0,fallTransp:0.1,fallSpeed:0.6,nyBall:true,nyStar:true,nyCone:true,nyCandy:true,nyIcicle:true,nyDot:true});
+  building=-1;build();flakes=[];syncFlakes();save();buildPanel();
+}
 function applyCozy(){
   Object.assign(cfg,{palette:['#ffd58a'],spiderLook:'cute',style:'cozy',vine:true,wireColor:'#6b5548',wire:2,sag:0.06,bulbGap:30,fall:'leaves',snow:60,fallTransp:0.15,fallDepth:0.45,fallSpeed:0.7,stick:false,bulbSize:13,figSize:2,mode:'twinkle',speed:0.5,glow:0.9,
     shape:[0,1,2].map(layerPath)});
@@ -973,9 +1040,27 @@ function bakedHTML(){
   return PRISTINE.slice(0,i+open.length)+JSON.stringify(cfg).replace(/</g,'\\u003c')+PRISTINE.slice(j);
 }
 function download(){
-  const name=(document.getElementById('fname').value.trim()||'garland').replace(/[\\/:*?"<>|]/g,'')+'.html';
+  const fe=document.getElementById('fname');const name=((fe&&fe.value.trim())||'garland').replace(/[\\/:*?"<>|]/g,'')+'.html';
   const a=el('a',{href:URL.createObjectURL(new Blob([bakedHTML()],{type:'text/html'})),download:name});document.body.append(a);a.click();a.remove();
   toast('Файл скачан: '+name);
+  savedSig=cfgSig();updDirty();
+}
+/* ---------- unsaved changes ---------- */
+let savedSig=null;
+function cfgSig(c){return JSON.stringify(c||cfg)}
+function updDirty(){const d=document.getElementById('dirty');if(!d)return;d.style.display=savedSig!==null&&cfgSig()!==savedSig?'flex':'none'}
+function initDirty(){
+  savedSig=cfgSig();
+  const st=document.getElementById('stage');
+  const bar=(id,bg,...kids)=>el('div',{id,style:'display:none;align-items:center;gap:10px;flex-wrap:wrap;background:'+bg+';border:1px solid #ffb347;color:#ffd9a0;border-radius:8px;padding:8px 12px;font-size:13px'},...kids);
+  st.insertBefore(bar('dirty','#3a2410',el('span',null,'Есть правки, которых ещё нет в OBS. Скачай файл заново (или скопируй новую ссылку).'),el('button',{className:'small',textContent:'Скачать файл',on:{click:download}})),st.firstChild);
+  let ls=null;try{const raw=localStorage.getItem('garland-cfg');if(raw)ls=Object.assign(JSON.parse(JSON.stringify(DEFAULT)),JSON.parse(raw))}catch(e){}
+  if(ls&&cfgSig(ls)!==savedSig){
+    const rb=bar('restore','#1d2a3a',el('span',null,'В редакторе остались правки с прошлого раза, которых нет в этом файле.'),
+      el('button',{className:'small',textContent:'Вернуть правки',on:{click:()=>{cfg=ls;loadImages();flakes=[];syncFlakes();syncEdge();build();save();rerender();heatConnect();rb.remove()}}}),
+      el('button',{className:'small',textContent:'Оставить как в файле',on:{click:()=>{save();rb.remove()}}}));
+    rb.style.display='flex';st.insertBefore(rb,st.firstChild);
+  }
 }
 function shrinkImage(file){return new Promise(res=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const M=128;const k=Math.min(1,M/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/png'))};im.onerror=()=>res(null);im.src=r.result};r.readAsDataURL(file)})}
 
@@ -1024,12 +1109,16 @@ function tabShape(pn){
 }
 
 function tabHang(pn){
-  const st=cfg.style,isHal=st==='halloween'||HALLOWEEN.includes(st),isCozy=st==='cozy';
+  const st=cfg.style,isHal=st==='halloween'||HALLOWEEN.includes(st),isCozy=st==='cozy',isNY=st==='newyear';
   pn.append(sec('Стиль',
-    cards([['classic','Классика','💡'],['halloween','Хэллоуин','🎃'],['cozy','Уютная','🐱']],
+    cards([['classic','Классика','💡'],['halloween','Хэллоуин','🎃'],['cozy','Уютная','🐱'],['newyear','Новый год','🎄']],
       k=>k==='halloween'?isHal:st===k,k=>{cfg.style=k;changed(true);rerender()}),
     isHal?selectRow('Какие фигурки','style',[['halloween','Все вперемешку'],['pumpkin','Тыквы'],['ghost','Привидения'],['bat','Летучие мыши'],['cat','Чёрные кошки'],['spider','Пауки']],true):null,
-    el('div',{className:'btns'},el('button',{className:'wide',textContent:'✦ Готовый набор «Уютная осень»',on:{click:applyCozy}}))
+    el('div',{className:'btns'},el('button',{className:'wide',textContent:'✦ Готовый набор «Уютная осень»',on:{click:applyCozy}})),
+    el('div',{className:'btns'},el('button',{className:'wide',textContent:'✦ Готовый набор «Новый год»',on:{click:applyNewYear}}))
+  ));
+  if(isNY)pn.append(sec('Что висит',
+    el('div',{className:'grid2'},check('Шарики','nyBall',true),check('Звёздочки','nyStar',true),check('Шишки','nyCone',true),check('Леденцы','nyCandy',true),check('Сосульки','nyIcicle',true),check('Огоньки между','nyDot',true))
   ));
   if(isCozy)pn.append(sec('Что висит',
     el('div',{className:'grid2'},check('Лампы Эдисона','czEdison',true),check('Котики-фонарики','czCat',true),check('Привидения','czGhost',true),check('Огоньки','czDot',true),check('Бусины','czBead',true),check('Листики','czLeaf',true)),
@@ -1039,7 +1128,7 @@ function tabHang(pn){
   const drawPal=()=>{pal.innerHTML='';cfg.palette.forEach((c,i)=>{pal.append(el('div',{className:'sw'},el('input',{type:'color',value:c,on:{input:e=>{cfg.palette[i]=e.target.value;changed(false)}}}),el('b',{textContent:'×',on:{click:()=>{if(cfg.palette.length>1){cfg.palette.splice(i,1);drawPal();changed(false)}}}})))});pal.append(el('button',{textContent:'+',on:{click:()=>{cfg.palette.push('#ffffff');drawPal();changed(false)}}}))};drawPal();
   const palSel=el('select',{on:{change:e=>{if(PALETTES[e.target.value]){cfg.palette=PALETTES[e.target.value].slice();drawPal();changed(false)}}}},el('option',{value:''},'Готовые цвета…'),...Object.keys(PALETTES).map(k=>el('option',{value:k},k)));
   pn.append(sec('Цвет и мерцание',
-    isCozy?el('p',{className:'note'},'Цвета красят маленькие огоньки.'):isHal?el('p',{className:'note'},'Цвета красят свечение вокруг мышей и пауков.'):null,
+    isCozy?el('p',{className:'note'},'Цвета красят маленькие огоньки.'):isNY?el('p',{className:'note'},'Цвета красят шарики и огоньки.'):isHal?el('p',{className:'note'},'Цвета красят свечение вокруг мышей и пауков.'):null,
     el('div',{className:'row'},palSel),pal,
     selectRow('Как мерцают','mode',[['twinkle','Мерцание'],['steady','Горят ровно'],['chase','Бегущие огни'],['wave','Волна'],['flash','Случайные вспышки'],['cycle','Перелив цветов']]),
     slider('Скорость','speed',0.1,3,0.05,v=>v.toFixed(2)+'×'),
@@ -1152,7 +1241,7 @@ function tabSave(pn){
   const url=LINK_BASE+'#c='+enc(cfg);
   const long=url.length>15000||FROM_FILE;
   const ta=el('textarea',{readOnly:true,style:'display:none'});
-  const copy=()=>{const u=LINK_BASE+'#c='+enc(cfg);if(u.length>15000){toast('Ссылка слишком длинная — скачай файл');return}ta.style.display='block';ta.value=u;ta.select();try{navigator.clipboard.writeText(u).then(()=>toast('Ссылка скопирована'),()=>{})}catch(e){}};
+  const copy=()=>{const u=LINK_BASE+'#c='+enc(cfg);if(u.length>15000){toast('Ссылка слишком длинная — скачай файл');return}ta.style.display='block';ta.value=u;ta.select();savedSig=cfgSig();updDirty();try{navigator.clipboard.writeText(u).then(()=>toast('Ссылка скопирована'),()=>{})}catch(e){}};
   const fileBtn=el('button',{className:long?'primary':'wide',textContent:'Скачать файл для OBS',on:{click:download}});
   const linkBtn=el('button',{className:long?'wide':'primary',textContent:'Скопировать ссылку для OBS',on:{click:copy}});
   pn.append(sec('Отправить в OBS',
@@ -1246,7 +1335,7 @@ function heatStatus(){dbgShow();const el=document.getElementById('heatst');if(!e
 
 /* ---------- start ---------- */
 loadImages();
-if(EDIT)initEditor();
+if(EDIT){initEditor();initDirty()}
 resize();build();syncFlakes();syncEdge();heatConnect();
 addEventListener('resize',()=>{const oldVH=VH;resize();if(VH!==oldVH){build();flakes=[];syncFlakes()}});
 if(EDIT)new ResizeObserver(()=>resize()).observe(document.getElementById('wrap'));
