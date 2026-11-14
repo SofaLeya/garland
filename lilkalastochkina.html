@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Гирлянда для OBS</title>
-<meta name="garland-version" content="2026-11-14.7">
+<meta name="garland-version" content="2026-11-14.8">
 <style>
 :root{--bg:#121018;--panel:#1b1822;--panel2:#24202d;--line:#332d3e;--text:#efeaf5;--muted:#9c94ab;--accent:#ffb347;--accent-ink:#2a1a05;--danger:#ff6b7d}
 *{box-sizing:border-box}
@@ -147,7 +147,7 @@ const DEFAULT = {
   mode:'twinkle', speed:1, glow:1, style:'classic', figSize:2, vine:false, czEdison:true, czCat:true, czGhost:true, czDot:true, czBead:true, czLeaf:true, czEvery:10, nyBall:true, nyStar:true, nyCone:true, nyCandy:true, nyIcicle:true, nyDot:true,
   wireColor:'#1a2a1e', wire:2.5, wireStyle:'plain', bulbShape:'classic',
   images:[], imgModes:[], imgSizes:[], imgPins:{}, imgCount:1, imgPos:0.5, imgEvery:3, imgSize:2.2, imgGlow:true,
-  snow:140, flake:1, stick:true, fall:'snow', snowLook:'soft', leafLook:'mix', petalLook:'pinkred', fallTransp:0, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
+  snow:140, flake:1, stick:true, fall:'snow', fall2:'none', snow2:80, snowLook:'soft', leafLook:'mix', petalLook:'pinkred', fallTransp:0, fallSpeed:1, fallDepth:1, fallClear:0, edgeSpiders:false, edgeSpiderCount:2, spiderLook:'classic', spiderDepth:0.55, spiderMid:0.1, spiderThread:1,
   wind:0.3, gust:0.5, heatLogin:'', heatId:'', heatProvider:'heat', tugPower:1, clickRings:true,
 };
 
@@ -408,7 +408,7 @@ function step(dt,settle){
     const v=Math.hypot(p.x-p.px,p.y-p.py);
     if(v>0.9){const loss=Math.min(p.snow,(v-0.9)*0.07);p.snow-=loss;if(Math.random()<loss*5)flakes.push(newFlake(p.x,p.y+2,true,'snow'))}
   }
-  updateFlakes(t);
+  updateFlakes(t);updateFx(t);
   for(let i=0;i<edgeSp.length;i++)if(updSpider(edgeSp[i],t))edgeSp[i]=spiderInit({slot:edgeSp[i].slot},edgeX(edgeSp[i].slot));
 }
 const PETAL_COLORS=['#ff9cc0','#ff6f9c','#f03a5f','#ffc4d8','#d81e46'];
@@ -491,7 +491,12 @@ function drawSpiderParticle(f,t){
   const R=f.s*0.75;ctx.globalCompositeOperation='lighter';ctx.globalAlpha=0.3;ctx.drawImage(glowSprite('#a99cff'),f.x-R,f.y+f.s*0.25-R,R*2,R*2);ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
   ctx.translate(f.x,-10);drawSpider(f.s,1,t,f,null,f.y+10);ctx.restore();
 }
-function fallCount(){const n=cfg.snow;switch(cfg.fall){case 'petals':return Math.round(n*0.5);case 'leaves':return Math.round(n*0.22);case 'spiders':return Math.min(30,Math.round(n/14));}return n}
+const OLD_FALL=['snow','leaves','petals','spiders'];
+// what is falling: the main choice plus an optional second layer
+function layersOf(){const L=[[cfg.fall,cfg.snow]];if(cfg.fall2&&cfg.fall2!=='none'&&cfg.fall2!==cfg.fall)L.push([cfg.fall2,cfg.snow2]);return L}
+function activeFall(k){return layersOf().some(l=>l[0]===k)}
+function fallCountK(k,n){switch(k){case 'snow':return n;case 'petals':return Math.round(n*0.5);case 'leaves':return Math.round(n*0.22);case 'spiders':return Math.min(30,Math.round(n/14));}return 0}
+function fallCount(){return fallCountK(cfg.fall,cfg.snow)}
 function newFlake(x,y,tmp,kind){
   kind=kind||cfg.fall;
   const r=(0.8+Math.random()*2.2)*cfg.flake;
@@ -508,10 +513,12 @@ function newFlake(x,y,tmp,kind){
   return f;
 }
 function syncFlakes(){
-  let perm=flakes.filter(f=>!f.tmp&&f.kind===cfg.fall);const tmp=flakes.filter(f=>f.tmp);const N=fallCount();
-  while(perm.length<N){const f=newFlake(Math.random()*(VW+400)-200,Math.random()*VH*Math.min(1,cfg.fallDepth),false);if(f.kind==='spiders'&&Math.random()<0.5){f.y=Math.random()*f.target;}perm.push(f)}
-  perm.length=Math.min(perm.length,N);
-  flakes=perm.concat(tmp);
+  const tmp=flakes.filter(f=>f.tmp);let all=[];
+  for(const [k,n] of layersOf()){if(!OLD_FALL.includes(k))continue;
+    const perm=flakes.filter(f=>!f.tmp&&f.kind===k);const N=fallCountK(k,n);
+    while(perm.length<N){const f=newFlake(Math.random()*(VW+400)-200,Math.random()*VH*Math.min(1,cfg.fallDepth),false,k);if(k==='spiders'&&Math.random()<0.5){f.y=Math.random()*f.target;}perm.push(f)}
+    perm.length=Math.min(perm.length,N);all=all.concat(perm)}
+  flakes=all.concat(tmp);syncFx();
 }
 function updateFlakes(t){
   const out=[];
@@ -520,7 +527,7 @@ function updateFlakes(t){
     let gone=false;
     if(f.kind==='spiders'){
       gone=updSpider(f,t);
-      if(gone){if(!f.tmp)out.push(newFlake(0,0,false));continue}
+      if(gone){if(!f.tmp&&activeFall('spiders'))out.push(newFlake(0,0,false,'spiders'));continue}
       out.push(f);continue;
     }
     const sp=f.tmp?1:cfg.fallSpeed;
@@ -547,10 +554,126 @@ function updateFlakes(t){
         }
       }
     }
-    if(gone){if(!f.tmp&&f.kind===cfg.fall){const n=newFlake(Math.random()*(VW+400)-200,-30-Math.random()*60,false);out.push(n)}}
+    if(gone){if(!f.tmp&&activeFall(f.kind)){const n=newFlake(Math.random()*(VW+400)-200,-30-Math.random()*60,false,f.kind);out.push(n)}}
     else out.push(f);
   }
   flakes=out;
+}
+
+
+/* ---------- more weather: confetti, rain, fireflies, bubbles… ---------- */
+const FX_KINDS=['confetti','sparkles','blizzard','rain','fluff','butterflies','fireflies','hearts','stars','shooting','bubbles','bats','fog'];
+const FALLING=['snow','leaves','petals','confetti','sparkles','blizzard','rain','hearts','stars','fluff'];
+const WEATHER=[['snow','Снег','❄️'],['blizzard','Метель','🌨️'],['rain','Дождь','🌧️'],['leaves','Листья','🍂'],['petals','Лепестки','🌸'],['fluff','Пух','🌬️'],['confetti','Конфетти','🎊'],['sparkles','Блёстки','✨'],['hearts','Сердечки','💕'],['stars','Звёздочки','⭐'],['shooting','Падающие звёзды','🌠'],['bubbles','Пузыри','⚪'],['fireflies','Светлячки','💛'],['butterflies','Бабочки','🦋'],['bats','Летучие мыши','🦇'],['spiders','Паучки','🕷️'],['fog','Туман','🌫️']];
+let fx=[];
+const CONF=['#ff595e','#ffca3a','#8ac926','#1982c4','#6a4c93','#ff7ad9','#ffffff'];
+const BFLY=['#ff9ad5','#9ad0ff','#ffd36b','#b69aff','#8ef0c0'];
+function fxCount(k,n){switch(k){case 'confetti':return Math.round(n*0.6);case 'sparkles':return Math.round(n*0.8);case 'blizzard':return Math.round(n*1.3);case 'rain':return Math.round(n*1.2);case 'fluff':return Math.round(n*0.25);
+  case 'butterflies':return Math.min(16,Math.ceil(n/14));case 'fireflies':return Math.min(70,Math.ceil(n/3));case 'hearts':case 'stars':return Math.round(n*0.35);case 'bubbles':return Math.min(45,Math.ceil(n/5));case 'bats':return Math.min(12,Math.ceil(n/18));case 'fog':return n?7:0}return 0}
+function fxDepth(){return cfg.fallDepth<1?VH*cfg.fallDepth+20:VH+40}
+function fxLayers(){return layersOf().filter(l=>FX_KINDS.includes(l[0]))}
+function newFx(k,init){
+  const z=cfg.flake,R=Math.random,f={kind:k,ph:R()*6.283,r:(0.7+R()*0.6)*z,rot:R()*6.283,vr:(R()-0.5)*0.08,fl:R()*6.283,vf:0.05+R()*0.1,c:pick(CONF),life:1};
+  const top=()=>{f.x=R()*(VW+400)-200;f.y=init?R()*fxDepth():-20-R()*80};
+  switch(k){
+    case 'confetti':top();f.vy=0.9+R()*0.9;f.curl=R()<0.2;f.r*=2;break;
+    case 'sparkles':top();f.vy=0.3+R()*0.5;f.c=R()<0.5?'#fff3b0':'#ffffff';break;
+    case 'blizzard':top();f.vy=1.6+R()*1.6;f.r=(0.6+R()*1.4)*z;break;
+    case 'rain':top();f.vy=10+R()*5;f.vx=0;f.r=z;break;
+    case 'hearts':top();f.vy=0.6+R()*0.6;f.c=pick(['#ff2d55','#ff7aa2','#ffc2d4','#ff4d6d']);break;
+    case 'stars':top();f.vy=0.5+R()*0.6;f.c=pick(['#ffd25a','#fff3b0','#ffffff']);break;
+    case 'fluff':f.x=R()*VW;f.y=init?R()*VH*0.9:-20;f.vy=0.15+R()*0.25;break;
+    case 'fireflies':f.x=R()*VW;f.y=VH*(0.15+R()*0.8);f.a=R()*6.283;f.sp=0.4+R()*0.6;break;
+    case 'butterflies':f.x=R()*VW;f.y=VH*(0.1+R()*0.8);f.a=R()*6.283;f.sp=1+R()*0.8;f.c=pick(BFLY);break;
+    case 'bats':{const L=R()<0.5;f.dir=L?1:-1;f.x=init?R()*VW:(L?-60:VW+60);f.y=VH*(0.08+R()*0.5);f.sp=2.5+R()*2;f.wait=init?0:R()*120;break}
+    case 'bubbles':f.x=R()*VW;f.y=init?VH*(0.3+R()*0.7):VH+30;f.vy=-(0.5+R()*0.8);f.top=VH*(0.05+R()*0.6);f.r=(10+R()*16)*z;f.pop=0;break;
+    case 'fog':f.x=R()*(VW+600)-300;f.y=VH*(0.82+R()*0.2);f.r=260+R()*220;f.vx=(R()-0.5)*0.3;break;
+    case 'shooting':{f.x=R()*VW*0.9+VW*0.05;f.y=R()*VH*0.35;const a=(R()<0.5?0.35:Math.PI-0.35)+(R()-0.5)*0.3;f.vx=Math.cos(a)*16;f.vy=Math.sin(a)*16;break}
+  }
+  return f;
+}
+function syncFx(){
+  let out=fx.filter(f=>f.kind==='splash');
+  for(const [k,n] of fxLayers()){const mine=fx.filter(f=>f.kind===k);const N=fxCount(k,n);while(mine.length<N)mine.push(newFx(k,true));if(k!=='shooting')mine.length=Math.min(mine.length,N);out=out.concat(mine)}
+  fx=out;
+}
+function updateFx(t){
+  const out=[],sp=cfg.fallSpeed,ssp=Math.sqrt(sp),lim=fxDepth(),lay=fxLayers();
+  for(const f of fx){let gone=false;const w=windAt(t,f.x);
+    switch(f.kind){
+      case 'confetti':f.y+=f.vy*sp*(0.8+0.3*Math.sin(t*2+f.ph));f.x+=(w*40+Math.sin(t*1.3+f.ph)*0.8)*ssp;f.rot+=f.vr;f.fl+=f.vf;gone=f.y>lim;break;
+      case 'sparkles':f.y+=f.vy*sp;f.x+=(w*25+Math.sin(t+f.ph)*0.3)*ssp;gone=f.y>lim;break;
+      case 'blizzard':{const d=windDir(t)||1;f.y+=f.vy*sp;f.x+=(w*70+Math.sign(d)*(1.6+1.2*Math.max(0,Math.sin(t*0.6+f.ph*0.1))))*ssp*(0.6+f.r*0.3);gone=f.y>lim||f.x<-260||f.x>VW+260;break}
+      case 'rain':f.vx=w*90;f.y+=f.vy*sp;f.x+=f.vx*ssp*0.6;if(f.y>lim){gone=true;if(cfg.fallDepth>=1&&Math.random()<0.4)out.push({kind:'splash',x:f.x,y:VH-4-Math.random()*10,life:1,r:f.r})}break;
+      case 'hearts':case 'stars':f.y+=f.vy*sp*(0.8+0.3*Math.sin(t*1.1+f.ph));f.x+=(w*35+Math.sin(t*0.9+f.ph)*0.7)*ssp;f.rot+=f.vr*0.5;f.fl+=f.vf*0.5;gone=f.y>lim;break;
+      case 'fluff':f.y+=(f.vy+Math.sin(t*0.7+f.ph)*0.25)*sp;f.x+=(w*45+Math.sin(t*0.45+f.ph)*0.6)*ssp;f.rot=Math.sin(t*0.8+f.ph)*0.4;gone=f.y>lim||f.x<-100||f.x>VW+100;break;
+      case 'fireflies':f.a+=Math.sin(t*0.7+f.ph*3)*0.04+(Math.random()-0.5)*0.08;f.x+=Math.cos(f.a)*f.sp+w*8;f.y+=Math.sin(f.a)*f.sp*0.7;
+        if(f.x<10||f.x>VW-10)f.a=Math.PI-f.a;if(f.y<VH*0.08||f.y>VH-10)f.a=-f.a;f.x=Math.max(5,Math.min(VW-5,f.x));f.y=Math.max(VH*0.05,Math.min(VH-5,f.y));break;
+      case 'butterflies':f.a+=Math.sin(t*0.9+f.ph*2)*0.03+(Math.random()-0.5)*0.06;f.x+=Math.cos(f.a)*f.sp+w*15;f.y+=Math.sin(f.a)*f.sp*0.6+Math.sin(t*6+f.ph)*0.6;
+        if(f.x<20||f.x>VW-20)f.a=Math.PI-f.a;if(f.y<VH*0.08||f.y>VH*0.95)f.a=-f.a;f.x=Math.max(10,Math.min(VW-10,f.x));f.y=Math.max(VH*0.05,Math.min(VH*0.97,f.y));f.fl+=0.35;break;
+      case 'bats':if(f.wait>0){f.wait--;break}f.x+=f.dir*f.sp;f.y+=Math.sin(t*2+f.ph)*0.8;f.fl+=0.45;gone=f.dir>0?f.x>VW+80:f.x<-80;break;
+      case 'bubbles':if(f.pop){f.pop+=0.08;gone=f.pop>=1;break}f.y+=f.vy;f.x+=Math.sin(t*1.2+f.ph)*0.5+w*20;if(f.y<f.top)f.pop=0.01;break;
+      case 'fog':f.x+=f.vx+w*12;if(f.x>VW+400)f.x=-400;if(f.x<-400)f.x=VW+400;break;
+      case 'shooting':f.x+=f.vx;f.y+=f.vy;f.life-=0.018;gone=f.life<=0;break;
+      case 'splash':f.life-=0.08;gone=f.life<=0;break;
+    }
+    if(gone){if(f.kind!=='splash'&&f.kind!=='shooting'&&lay.some(l=>l[0]===f.kind))out.push(newFx(f.kind,false))}else out.push(f);
+  }
+  for(const [k,n] of lay)if(k==='shooting'&&Math.random()<0.0015+n/500*0.01)out.push(newFx('shooting',true));
+  fx=out;
+}
+function fadeXY(x,y){
+  let a=1;
+  if(cfg.fallDepth<1){const L=VH*cfg.fallDepth,st=L*0.55;if(y>st)a*=Math.max(0,1-(y-st)/(L-st))}
+  if(cfg.fallClear>0){const u=Math.abs(x/VW-0.5)*2,c=cfg.fallClear;if(u<c){const e=c*0.55;a*=u<e?0:(u-e)/(c-e)}}
+  return a;
+}
+function heartPath(w){ctx.beginPath();ctx.moveTo(0,-w*0.25);ctx.bezierCurveTo(0,-w*0.8,-w,-w*0.8,-w,-w*0.1);ctx.bezierCurveTo(-w,w*0.45,-w*0.25,w*0.65,0,w);ctx.bezierCurveTo(w*0.25,w*0.65,w,w*0.45,w,-w*0.1);ctx.bezierCurveTo(w,-w*0.8,0,-w*0.8,0,-w*0.25);ctx.closePath()}
+function starPath(R,ri){ctx.beginPath();for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,rr=k%2?ri:R;ctx.lineTo(Math.cos(a)*rr,Math.sin(a)*rr)}ctx.closePath()}
+function drawFx(t){
+  const tr=1-(cfg.fallTransp||0);
+  for(const f of fx){if(f.kind!=='fog')continue;
+    const g=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.r);const b=0.10+0.04*Math.sin(t*0.3+f.ph);g.addColorStop(0,`rgba(220,226,240,${b})`);g.addColorStop(1,'rgba(220,226,240,0)');
+    ctx.globalAlpha=tr;ctx.fillStyle=g;ctx.fillRect(f.x-f.r,f.y-f.r,f.r*2,f.r*2)}
+  for(const f of fx){
+    if(f.kind==='fog')continue;
+    let a=tr;if(FALLING.includes(f.kind))a*=fadeXY(f.x,f.y);if(a<=0.01)continue;
+    ctx.globalAlpha=a;
+    switch(f.kind){
+      case 'confetti':ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.rot);
+        if(f.curl){ctx.strokeStyle=f.c;ctx.lineWidth=1.6*f.r;ctx.lineCap='round';ctx.beginPath();for(let i=0;i<=10;i++)ctx.lineTo(Math.sin(i*0.9+f.fl)*f.r*2.2,(i-5)*f.r*1.6);ctx.stroke()}
+        else{ctx.scale(1,Math.cos(f.fl)||0.05);ctx.fillStyle=f.c;ctx.fillRect(-f.r*3,-f.r*1.6,f.r*6,f.r*3.2)}
+        ctx.restore();break;
+      case 'sparkles':{const tw=Math.pow(0.5+0.5*Math.sin(t*5+f.ph*7),2);ctx.globalCompositeOperation='lighter';ctx.globalAlpha=a*(0.3+0.7*tw);const s=f.r*(3+2*tw);
+        ctx.fillStyle=f.c;ctx.beginPath();ctx.moveTo(f.x,f.y-s);ctx.quadraticCurveTo(f.x,f.y,f.x+s,f.y);ctx.quadraticCurveTo(f.x,f.y,f.x,f.y+s);ctx.quadraticCurveTo(f.x,f.y,f.x-s,f.y);ctx.quadraticCurveTo(f.x,f.y,f.x,f.y-s);ctx.fill();
+        ctx.globalCompositeOperation='source-over';break}
+      case 'blizzard':{ctx.globalAlpha=a*(0.5+0.4*Math.min(1,f.r/2));const R=f.r*1.7;ctx.drawImage(flakeSprite,f.x-R,f.y-R,R*2,R*2);break}
+      case 'rain':ctx.globalAlpha=a*0.55;ctx.strokeStyle='#bcd6ff';ctx.lineWidth=Math.max(1,f.r*1.2);ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(f.x-f.vx*1.2,f.y-f.vy*1.6);ctx.stroke();break;
+      case 'splash':ctx.globalAlpha=0.5*f.life*tr;ctx.strokeStyle='#bcd6ff';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(f.x,f.y,(1-f.life)*10*f.r+2,(1-f.life)*3*f.r+1,0,Math.PI,2*Math.PI);ctx.stroke();break;
+      case 'hearts':ctx.save();ctx.translate(f.x,f.y);ctx.rotate(Math.sin(f.rot)*0.4);ctx.scale(0.4+0.6*Math.abs(Math.cos(f.fl)),1);ctx.globalAlpha=a*0.9;ctx.fillStyle=f.c;heartPath(f.r*8);ctx.fill();ctx.restore();break;
+      case 'stars':ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.rot);ctx.globalAlpha=a*0.9;ctx.fillStyle=f.c;starPath(f.r*7,f.r*3);ctx.fill();ctx.restore();
+        ctx.globalCompositeOperation='lighter';ctx.globalAlpha=a*0.35;const R=f.r*10;ctx.drawImage(glowSprite('#ffd25a'),f.x-R,f.y-R,R*2,R*2);ctx.globalCompositeOperation='source-over';break;
+      case 'fluff':{ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.rot);ctx.globalAlpha=a*0.85;const L=f.r*10;ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,f.r*10);
+        for(let k=0;k<12;k++){const an=-Math.PI*(0.08+0.84*k/11);ctx.moveTo(0,0);ctx.lineTo(Math.cos(an)*L,Math.sin(an)*L)}ctx.stroke();
+        ctx.fillStyle='rgba(200,180,140,.9)';ctx.beginPath();ctx.ellipse(0,f.r*10,f.r*0.8,f.r*1.8,0,0,6.283);ctx.fill();ctx.restore();break}
+      case 'fireflies':{let bl=Math.max(0,Math.sin(t*1.8+f.ph*5));bl*=bl;if(bl<0.02)break;ctx.globalCompositeOperation='lighter';ctx.globalAlpha=a*bl;const R=f.r*14;ctx.drawImage(glowSprite('#d8ff6a'),f.x-R,f.y-R,R*2,R*2);
+        ctx.fillStyle='#f6ffb0';ctx.beginPath();ctx.arc(f.x,f.y,f.r*1.6,0,6.283);ctx.fill();ctx.globalCompositeOperation='source-over';break}
+      case 'butterflies':{const s=f.r*16,open=0.15+0.85*Math.abs(Math.sin(f.fl));ctx.save();ctx.translate(f.x,f.y);ctx.rotate(f.a);
+        for(const sd of [-1,1]){ctx.fillStyle=f.c;ctx.beginPath();ctx.ellipse(-s*0.05,sd*s*0.5*open,s*0.42,s*0.5*open,0,0,6.283);ctx.fill();
+          ctx.fillStyle=rgb(mix(hex2rgb(f.c),WHITE,0.35));ctx.beginPath();ctx.ellipse(-s*0.38,sd*s*0.35*open,s*0.26,s*0.32*open,0,0,6.283);ctx.fill()}
+        ctx.fillStyle='#2a2028';ctx.beginPath();ctx.ellipse(0,0,s*0.45,s*0.08,0,0,6.283);ctx.fill();ctx.restore();break}
+      case 'bats':{if(f.wait>0)break;const s=f.r*24,fl=Math.sin(f.fl);ctx.save();ctx.translate(f.x,f.y);ctx.fillStyle='#15101a';
+        for(const sd of [-1,1]){ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(sd*s*0.4,-s*0.3*fl-s*0.1,sd*s,-s*0.2*fl);ctx.lineTo(sd*s*0.75,s*0.05);ctx.quadraticCurveTo(sd*s*0.5,-s*0.02,sd*s*0.4,s*0.1);ctx.quadraticCurveTo(sd*s*0.25,0,0,s*0.08);ctx.closePath();ctx.fill()}
+        ctx.beginPath();ctx.ellipse(0,s*0.03,s*0.1,s*0.14,0,0,6.283);ctx.fill();ctx.fillStyle='#ff4040';ctx.beginPath();ctx.arc(-s*0.035,0,s*0.02,0,6.283);ctx.arc(s*0.035,0,s*0.02,0,6.283);ctx.fill();ctx.restore();break}
+      case 'bubbles':if(f.pop){ctx.globalAlpha=a*(1-f.pop);ctx.strokeStyle='rgba(255,255,255,.8)';ctx.lineWidth=1.5;ctx.setLineDash([3,5]);ctx.beginPath();ctx.arc(f.x,f.y,f.r*(1+f.pop*0.6),0,6.283);ctx.stroke();ctx.setLineDash([]);break}
+        {const g=ctx.createRadialGradient(f.x,f.y,f.r*0.5,f.x,f.y,f.r);g.addColorStop(0,'rgba(255,255,255,0)');g.addColorStop(0.8,'rgba(190,225,255,.18)');g.addColorStop(1,'rgba(230,245,255,.5)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.x,f.y,f.r,0,6.283);ctx.fill();
+        const h=ctx.createLinearGradient(f.x-f.r,f.y-f.r,f.x+f.r,f.y+f.r);h.addColorStop(0,'rgba(255,140,220,.22)');h.addColorStop(0.5,'rgba(140,255,230,.12)');h.addColorStop(1,'rgba(140,170,255,.22)');ctx.fillStyle=h;ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,.7)';ctx.beginPath();ctx.ellipse(f.x-f.r*0.4,f.y-f.r*0.45,f.r*0.22,f.r*0.12,-0.6,0,6.283);ctx.fill();break}
+      case 'shooting':{ctx.globalCompositeOperation='lighter';ctx.globalAlpha=a*Math.min(1,f.life*2);const g=ctx.createLinearGradient(f.x,f.y,f.x-f.vx*7,f.y-f.vy*7);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.strokeStyle=g;ctx.lineWidth=2*cfg.flake;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(f.x-f.vx*7,f.y-f.vy*7);ctx.stroke();const R=10*cfg.flake;ctx.drawImage(glowSprite('#cfe4ff'),f.x-R,f.y-R,R*2,R*2);ctx.globalCompositeOperation='source-over';break}
+    }
+  }
+  ctx.globalAlpha=1;
 }
 
 /* ---------- halloween figures ---------- */
@@ -1188,6 +1311,7 @@ function render(){
     ctx.globalAlpha=0.92*fa;ctx.drawImage(f.spr,-f.w/2,-f.w/2,f.w,f.w);ctx.restore();
   }
   ctx.globalAlpha=1;
+  drawFx(t);
   for(const f of edgeSp)drawSpiderParticle(f,t);
   for(const d of drags.values()){ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.arc(d.p.x,d.p.y,5,0,6.283);ctx.fill();ctx.strokeStyle='rgba(255,255,255,.4)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(d.p.x,d.p.y,11,0,6.283);ctx.stroke()}
   for(const r of rings){const k=r.life;ctx.strokeStyle=`rgba(255,255,255,${0.7*k})`;ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(r.x,r.y,(1-k)*38+6,0,6.283);ctx.stroke()}
@@ -1295,7 +1419,7 @@ function el(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(
 function sec(title,...kids){return el('div',{className:'sec'},el('h2',null,title),...kids)}
 function slider(label,key,min,max,stp,fmt,rb){
   const val=el('span',null,fmt(cfg[key]));
-  const inp=el('input',{type:'range',min,max,step:stp,value:cfg[key],on:{input:e=>{cfg[key]=+e.target.value;val.textContent=fmt(cfg[key]);if(key==='snow'||key==='flake'||key==='spiderDepth'||key==='spiderMid'||key==='fallDepth'||key==='edgeSpiderCount'){syncEdge();if(key!=='snow')flakes=[];syncFlakes()}changed(rb)}}});
+  const inp=el('input',{type:'range',min,max,step:stp,value:cfg[key],on:{input:e=>{cfg[key]=+e.target.value;val.textContent=fmt(cfg[key]);if(key==='snow'||key==='snow2'||key==='flake'||key==='spiderDepth'||key==='spiderMid'||key==='fallDepth'||key==='edgeSpiderCount'){syncEdge();if(key!=='snow'&&key!=='snow2'){flakes=[];fx=[]}syncFlakes()}changed(rb)}}});
   return el('div',{className:'row'},el('label',null,el('span',null,label),val),inp);
 }
 function check(label,key,rb){return el('label',{className:'chk'},el('input',{type:'checkbox',checked:!!cfg[key],on:{change:e=>{cfg[key]=e.target.checked;if(key==='edgeSpiders')syncEdge();changed(rb)}}}),label)}
@@ -1539,18 +1663,26 @@ function tabWeather(pn){
     spiders:['spiderLook',[['classic','Чёрные, с красными глазками'],['cute','Милые']]]};
   const lk=looks[fl];
   pn.append(sec('Что падает',
-    cards([['snow','Снег','❄️'],['leaves','Листья','🍂'],['petals','Лепестки','🌸'],['spiders','Паучки','🕷️']],k=>fl===k,k=>{cfg.fall=k;flakes=[];syncFlakes();for(const ch of chains)for(const q of ch.P)q.snow=0;changed(false);rerender()}),
+    cards(WEATHER,k=>fl===k,k=>{cfg.fall=k;flakes=[];fx=[];syncFlakes();for(const ch of chains)for(const q of ch.P)q.snow=0;changed(false);rerender()}),
     lk?selectRow('Вид',lk[0],lk[1]):null,
     slider('Сколько','snow',0,500,10,v=>v?v:'выкл'),
     slider('Размер','flake',0.4,2.5,0.1,v=>v.toFixed(1)+'×'),
     fl==='spiders'?slider('У краёв спускаются','spiderDepth',0.05,0.9,0.05,v=>'до '+Math.round(v*100)+'% экрана'):null,
     fl==='spiders'?slider('В середине спускаются','spiderMid',0.03,0.9,0.01,v=>'до '+Math.round(v*100)+'% экрана'):null,
     fl!=='spiders'?slider('Прозрачность','fallTransp',0,0.9,0.05,v=>v?Math.round(v*100)+'%':'нет'):null,
+    fl==='bubbles'?el('p',{className:'note'},'Пузыри лопаются от клика зрителя.'):null,
     fl==='snow'?check('Налипает на провод','stick'):null,
-    fl!=='spiders'?more('Ещё настройки',
+    FALLING.includes(fl)?more('Ещё настройки',
       slider('Скорость падения','fallSpeed',0.2,2.5,0.05,v=>v.toFixed(2)+'×'),
       slider('Докуда долетает','fallDepth',0.1,1,0.05,v=>v>=1?'до низа':'тает на '+Math.round(v*100)+'% экрана'),
       slider('Пустая зона в центре','fallClear',0,0.9,0.05,v=>v?Math.round(v*100)+'% ширины':'нет')):null
+  ));
+  const f2=el('select',{on:{change:e=>{cfg.fall2=e.target.value;flakes=flakes.filter(f=>f.tmp||f.kind===cfg.fall);fx=fx.filter(f=>f.kind===cfg.fall);syncFlakes();changed(false);rerender()}}},
+    el('option',{value:'none',selected:!cfg.fall2||cfg.fall2==='none'},'Нет'),...WEATHER.filter(([k])=>k!==fl).map(([k,l,i])=>el('option',{value:k,selected:cfg.fall2===k},i+' '+l)));
+  pn.append(sec('Второй слой',
+    el('p',{className:'note'},'Можно добавить второе поверх первого: например, снег и блёстки или листья и светлячков.'),
+    el('div',{className:'row'},f2),
+    cfg.fall2&&cfg.fall2!=='none'&&cfg.fall2!==fl?slider('Сколько','snow2',0,500,10,v=>v?v:'выкл'):null
   ));
   pn.append(sec('Паучки по краям',
     check('Включить','edgeSpiders'),
@@ -1691,6 +1823,7 @@ function tabSave(pn){
 /* ---------- viewer clicks (Heat extension) ---------- */
 let rings=[],heatWs=null,heatState='off',heatRetry=0;
 function tugAt(x,y,power){
+  for(const f of fx)if(f.kind==='bubbles'&&!f.pop&&Math.hypot(f.x-x,f.y-y)<f.r+40)f.pop=0.01;
   power=power==null?cfg.tugPower:power;
   if(cfg.clickRings)rings.push({x,y,life:1});
   let best=null,bd=170;
