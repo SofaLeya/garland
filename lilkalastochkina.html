@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Гирлянда для OBS</title>
-<meta name="garland-version" content="2026-11-14.1">
+<meta name="garland-version" content="2026-11-14.2">
 <style>
 :root{--bg:#121018;--panel:#1b1822;--panel2:#24202d;--line:#332d3e;--text:#efeaf5;--muted:#9c94ab;--accent:#ffb347;--accent-ink:#2a1a05;--danger:#ff6b7d}
 *{box-sizing:border-box}
@@ -1213,6 +1213,24 @@ function tabWeather(pn){
   ));
 }
 
+// test-only connection: opens a socket, reports whether the server answered, closes it
+function probeWs(url,ms){return new Promise(res=>{let done=false,ws=null;const fin=v=>{if(done)return;done=true;try{ws&&ws.close()}catch(e){}res(v)};
+  try{ws=new WebSocket(url)}catch(e){fin(false);return}ws.onopen=()=>fin(true);ws.onerror=()=>fin(false);ws.onclose=()=>fin(false);setTimeout(()=>fin(false),ms)})}
+async function checkBoth(login,out){
+  const v=login.value.trim().replace(/^@/,'').toLowerCase();
+  if(!v){out.textContent='Сначала впиши ник на Twitch';return}
+  const NM={green:'GreenHeat',heat:'Heat'},res={green:'проверяю…',heat:'проверяю…'};
+  const show=()=>{out.textContent='GreenHeat: '+res.green+'\nHeat: '+res.heat};show();
+  const g=probeWs('wss://heat.prod.kr/'+encodeURIComponent(v),8000).then(ok=>{res.green=ok?'✓ сервер отвечает':'✗ не отвечает';show();return ok});
+  const h=(async()=>{let id=/^\d+$/.test(v)?v:(cfg.heatLogin===v&&cfg.heatId)||'';
+    if(!id){try{const t=(await (await fetch('https://decapi.me/twitch/id/'+encodeURIComponent(v))).text()).trim();if(/^\d+$/.test(t))id=t}catch(e){}}
+    if(!id){res.heat='✗ не нашла канал с таким ником';show();return false}
+    const ok=await probeWs('wss://heat-api.j38.net/channel/'+encodeURIComponent(id),8000);res.heat=ok?'✓ сервер отвечает':'✗ не отвечает';show();return ok})();
+  const r={green:await g,heat:await h};const cur=cfg.heatProvider==='green'?'green':'heat',other=cur==='green'?'heat':'green';
+  let tip='Сейчас выбран '+NM[cur]+'. ';
+  if(r[cur])tip+='С ним всё в порядке.';else if(r[other])tip+='Он не отвечает, а '+NM[other]+' работает - можно переключиться на него (и включить его расширение на Twitch).';else tip+='Оба не отвечают - проверь интернет или попробуй позже.';
+  out.textContent+='\n\n'+tip+'\nЭто проверка связи с сервером. Работает ли само расширение у зрителей, покажет только настоящий клик.';
+}
 function tabStream(pn){
   const login=field({value:cfg.heatLogin||'',placeholder:'твой ник на Twitch'});
   const st=el('p',{className:'note',id:'heatst'});
@@ -1228,6 +1246,7 @@ function tabStream(pn){
     el('p',{className:'note'},'Нужно бесплатное расширение на твоём Twitch: Панель автора → Расширения → найти → Установить → Активировать как «Оверлей».'),
     cards([['green','GreenHeat — тянуть','✋'],['heat','Heat — только клик','👆']],k=>cfg.heatProvider===k,k=>{cfg.heatProvider=k;save();rerender();if(cfg.heatLogin)setTimeout(()=>document.getElementById('heatconnect')?.click(),0)}),
     login,el('div',{className:'btns'},el('button',{className:'primary',id:'heatconnect',textContent:'Подключить',on:{click:connect}})),st,
+    (()=>{const out=el('p',{className:'note',style:'white-space:pre-line'});return el('div',null,el('div',{className:'btns'},el('button',{className:'wide',textContent:'Проверить связь: Heat и GreenHeat',on:{click:()=>checkBoth(login,out)}})),out)})(),
     slider('Сила рывка','tugPower',0.3,3,0.1,v=>v.toFixed(1)+'×'),
     more('Ещё настройки',
       check('Кружок на месте клика','clickRings'),
