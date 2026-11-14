@@ -1753,7 +1753,7 @@ function tabTest(pn){
     return el('div',{style:'margin:0 0 12px'},el('div',{style:'font-weight:600;margin:0 0 6px'},title),
       el('div',{className:'btns'},
         el('button',{className:'small',textContent:'Открыть',on:{click:()=>window.open(url,'_blank')}}),
-        el('button',{className:'small',textContent:'Скопировать',on:{click:()=>{ta.select();try{navigator.clipboard.writeText(url).then(()=>toast('Скопировано'),()=>{})}catch(e){}}}})),
+        el('button',{className:'small',textContent:'Скопировать',on:{click:()=>{ta.select();copyText(url,()=>toast('Скопировано'),ta)}}})),
       ta,note?el('p',{className:'note'},note):null);
   };
   const make=async()=>{
@@ -1785,7 +1785,7 @@ function tabSave(pn){
   const url=LINK_BASE+'#c='+enc(cfg);
   const long=url.length>15000||FROM_FILE;
   const ta=el('textarea',{readOnly:true,style:'display:none'});
-  const copy=()=>{const u=LINK_BASE+'#c='+enc(cfg);if(u.length>15000){toast('Ссылка слишком длинная — скачай файл');return}ta.style.display='block';ta.value=u;ta.select();savedSig=cfgSig();updDirty();try{navigator.clipboard.writeText(u).then(()=>toast('Ссылка скопирована'),()=>{})}catch(e){}};
+  const copy=()=>{const u=LINK_BASE+'#c='+enc(cfg);if(u.length>15000){toast('Ссылка слишком длинная — скачай файл');return}ta.style.display='block';ta.value=u;ta.select();savedSig=cfgSig();updDirty();copyText(u,()=>toast('Ссылка скопирована'),ta)};
   const fileBtn=el('button',{className:long?'primary':'wide',textContent:'Скачать файл для OBS',on:{click:download}});
   const linkBtn=el('button',{className:long?'wide':'primary',textContent:'Скопировать ссылку для OBS',on:{click:copy}});
   pn.append(sec('Отправить в OBS',
@@ -1856,6 +1856,10 @@ function demoDrag(){
   const ch=chains[Math.random()*chains.length|0];if(!ch)return;const p=ch.P[(ch.P.length*(0.2+Math.random()*0.6))|0];
   const id='demo'+Math.random(),sx=p.x,sy=p.y,ang=Math.random()*Math.PI;let k=0;
   const iv=setInterval(()=>{k++;dragAt(id,sx+Math.cos(ang)*k*14,sy+Math.abs(Math.sin(ang))*k*14);if(k>=12){clearInterval(iv);setTimeout(()=>releaseDrag(id),300)}},80);
+}
+function copyText(t,ok,ta){
+  const fallback=()=>{try{let a=ta;let tmp=false;if(!a){a=document.createElement('textarea');a.value=t;a.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(a);tmp=true}a.focus();a.select();const r=document.execCommand('copy');if(tmp)a.remove();if(r)ok()}catch(e){}};
+  if(window.isSecureContext&&navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fallback)}else fallback();
 }
 function heatConnect(){
   if(heatWs){try{heatWs.onclose=null;heatWs.close()}catch(e){}heatWs=null}
