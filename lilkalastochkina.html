@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Гирлянда для OBS</title>
-<meta name="garland-version" content="2026-11-14.6">
+<meta name="garland-version" content="2026-11-14.7">
 <style>
 :root{--bg:#121018;--panel:#1b1822;--panel2:#24202d;--line:#332d3e;--text:#efeaf5;--muted:#9c94ab;--accent:#ffb347;--accent-ink:#2a1a05;--danger:#ff6b7d}
 *{box-sizing:border-box}
@@ -53,7 +53,8 @@ textarea{width:100%;height:70px;background:#0e0c12;color:var(--text);border:1px 
 #frame.bg-light{background:linear-gradient(#dfe6ef,#c4cfdc)}
 #frame #cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
 .tabs{position:sticky;top:-18px;z-index:5;display:flex;gap:4px;background:var(--panel);padding:8px 0 10px;margin:0 0 6px;border-bottom:1px solid var(--line)}
-.tabs button{flex:1 1 auto;min-width:0;padding:7px 1px;font-size:11px;border-radius:8px;letter-spacing:-.01em}
+.tabs{display:grid!important;grid-template-columns:repeat(3,1fr)}
+.tabs button{min-width:0;padding:7px 4px;font-size:12px;border-radius:8px;white-space:nowrap}
 .tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 12px}
 .card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 4px;font-size:11.5px;line-height:1.2;text-align:center}
